@@ -10,13 +10,13 @@ import { useWeather } from '@/hooks/useWeather';
 import { TodayVisual } from '@/views/TodayVisual';
 import { TodaySun } from '@/views/TodaySun';
 import { TodayWindguru } from '@/views/TodayWindguru';
-import { ComingSoon } from '@/views/ComingSoon';
+import { TodayGraph } from '@/views/TodayGraph';
 import { LocationSwitcher } from '@/components/LocationSwitcher';
 
 const SUB_VIEWS: { key: TodaySubView; label: string; enabled: boolean }[] = [
   { key: 'visual', label: 'Visual', enabled: true },
   { key: 'windguru', label: 'Windguru', enabled: true },
-  { key: 'graph', label: 'Graph', enabled: false },
+  { key: 'graph', label: 'Graph', enabled: true },
   { key: 'sun', label: 'Sun', enabled: true },
 ];
 
@@ -47,7 +47,7 @@ export function TodayView() {
         ))}
       </div>
 
-      <div className={`min-h-0 flex-1 ${todaySub === 'windguru' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+      <div className={`min-h-0 flex-1 ${todaySub === 'windguru' || todaySub === 'graph' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
         {loading && !data && <Centered>Loading {activeLocation.name}…</Centered>}
         {error && !data && <Centered>Couldn’t load weather — {error}</Centered>}
         {data && (
@@ -60,7 +60,7 @@ export function TodayView() {
             {todaySub === 'visual' && <TodayVisual weather={data} onOpenSwitcher={() => setSwitcherOpen(true)} />}
             {todaySub === 'sun' && <TodaySun weather={data} />}
             {todaySub === 'windguru' && <TodayWindguru weather={data} />}
-            {todaySub === 'graph' && <ComingSoon title="Today · Graph" />}
+            {todaySub === 'graph' && <TodayGraph weather={data} />}
           </>
         )}
       </div>
