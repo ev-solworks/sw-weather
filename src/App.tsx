@@ -9,6 +9,7 @@ import { TabBar } from '@/components/TabBar';
 import { HomeView } from '@/views/HomeView';
 import { TodayView } from '@/views/TodayView';
 import { WeekView } from '@/views/WeekView';
+import { WindView } from '@/views/WindView';
 import { ComingSoon } from '@/views/ComingSoon';
 
 function CurrentView() {
@@ -21,7 +22,7 @@ function CurrentView() {
     case 'week':
       return <WeekView />;
     case 'map':
-      return <ComingSoon title="Map" />;
+      return <WindView />;
     case 'more':
       return <ComingSoon title="More" />;
   }

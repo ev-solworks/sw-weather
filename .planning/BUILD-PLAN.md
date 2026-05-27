@@ -88,7 +88,24 @@ Get real, normalized `WeatherConditions` for one location before any view work.
 
 ---
 
-## Live wind stations (future feature)
+## Live wind stations (Wind tab) — BUILT 2026-05-27
+A 2×3 grid of live measured wind stations on the **Map/Wind tab**: each a "Sweep"
+rosette (colored arc + bold pointer on the FROM-bearing, N/E/S/W) around a centered
+speed readout; **knots default + km/h toggle** (persisted); tap → bottom-sheet detail
+with current reading + wind/gust graph over **1h/6h/12h/24h** (1h = minute series,
+6/12/24h sliced from the 24h hourly series).
+- Backend: `weather_stations` + `weather_station_cache` tables; `weather-stations`
+  edge fn (`?` all-live grid; `?station=&history` for detail), live cached 60s / history 5min.
+- Client: `services/stations.ts`, `components/WindRosette.tsx`, `views/WindView.tsx`.
+- **Stations are seeded, NOT auto-discovered.** OceanDrivers has no list endpoint and
+  silently falls back unknown ids to a default station, so only IDs returning DISTINCT
+  coords are real. Verified 4: **rcnp, cncg, cmsap, cnarenal** (Bay of Palma). Adding
+  more = insert a verified row in `weather_stations` (data-only, no code).
+- TODO: find more real OceanDrivers Mallorca station ids (their map/site); then
+  Holfuy/Pioupiou for Tarifa + wider Balearics (see WIND-STATIONS-RESEARCH.md). Sources
+  kept for later per user (Mallorca focus now).
+
+### Earlier future-notes (kept)
 A dedicated page: map of live measured stations (à la **wynd.live** — kitesurf/wingfoil
 aggregator, Mediterranean/Mallorca, live wind+gust+direction, community-rated spots)
 with live readings + the wind/gust history graph already built.

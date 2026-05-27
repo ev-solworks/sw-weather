@@ -1,0 +1,251 @@
+<!doctype html>
+<!-- MOCKUP — Live Wind Stations (Map tab). 2×4 grid of station cards; each:
+     direction rosette (ring) around a centred wind/gust readout. Tap → detail
+     sheet with a wind+gust graph and 1h/6h/12h/24h range. Sample data only.
+     Dark navy shell to match the app. Throwaway — for design sign-off. -->
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Live Wind Stations — mockup</title>
+<style>
+  :root{
+    --bg:#0a0f1c; --panel:#0c1428; --panel2:#101a2e; --border:#1b2440;
+    --hi:#fafafa; --lo:#8a93a8; --xlo:#5a6480;
+    --wind:#34d399; --gust:#7fd02a;
+    --mono:"JetBrains Mono", ui-monospace, monospace;
+    --sans:"Inter",-apple-system,system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#05070d;font-family:var(--sans);color:var(--hi);display:flex;justify-content:center;gap:40px;flex-wrap:wrap;padding:30px}
+  .frame{width:390px;height:844px;background:var(--bg);border-radius:38px;overflow:hidden;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.6);display:flex;flex-direction:column}
+  .label{position:absolute;top:-22px;left:4px;font:600 11px var(--mono);color:#667;letter-spacing:.5px}
+
+  /* app bar + location strip */
+  .appbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 8px;flex-shrink:0}
+  .appbar .title{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600}
+  .badge{font:700 10px var(--mono);background:var(--hi);color:var(--bg);padding:3px 6px;border-radius:3px;letter-spacing:.5px}
+  .live{display:flex;align-items:center;gap:6px;font:600 10px var(--mono);color:var(--wind);letter-spacing:1px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--wind);box-shadow:0 0 8px var(--wind);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .sub{padding:0 16px 10px;font-size:12px;color:var(--lo)}
+
+  /* grid — 2×3 */
+  .grid{flex:1;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;gap:11px;padding:6px 13px 18px;align-content:start}
+  .card{position:relative;border:1px solid var(--border);background:
+        radial-gradient(130% 110% at 50% -10%, #13213c 0%, var(--panel) 68%);
+        border-radius:20px;display:flex;flex-direction:column;align-items:center;
+        padding:13px 10px 12px;cursor:pointer;transition:border-color .15s, transform .15s}
+  .card:active{transform:scale(.98)}
+  .card:hover{border-color:#2c3c66}
+  /* header: station name, its own band at the top */
+  .card .name{font:600 12.5px var(--sans);color:var(--hi);letter-spacing:-.2px;line-height:1.15;text-align:center}
+  .card .place{font:500 8.5px var(--mono);color:var(--xlo);letter-spacing:.4px;text-transform:uppercase;margin-top:2px}
+
+  /* rosette: ring + ticks + edge arrow; speed lives centered inside */
+  .rose{position:relative;width:128px;height:128px;margin:11px 0 2px}
+  .rose svg{position:absolute;inset:0}
+  .readout{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .readout .ws{font:250 40px var(--mono);line-height:.92;color:var(--hi);font-variant-numeric:tabular-nums;letter-spacing:-1px}
+  .readout .unit{font:600 8.5px var(--mono);color:var(--lo);letter-spacing:1.5px;margin-top:4px}
+
+  /* gust + freshness: clean line BELOW the rosette, not crowding the ring */
+  .card .foot{display:flex;align-items:center;gap:7px;margin-top:8px;font:600 11px var(--mono);font-variant-numeric:tabular-nums}
+  .card .foot .g{color:var(--gust)}
+  .card .foot .g b{color:var(--gust);font-weight:700}
+  .card .foot .sep{width:3px;height:3px;border-radius:50%;background:var(--border)}
+  .card .foot .age{color:var(--xlo);display:flex;align-items:center;gap:4px}
+  .card .foot .age .ld{width:5px;height:5px;border-radius:50%;background:var(--wind);box-shadow:0 0 5px var(--wind)}
+
+  /* offline card */
+  .card.off{opacity:.5}
+  .card.off .ws{color:var(--xlo)}
+  .card.off .foot{color:var(--xlo)}
+
+  /* detail sheet */
+  .scrim{position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(3px);display:none;align-items:flex-end;z-index:20}
+  .scrim.open{display:flex}
+  .sheet{width:100%;max-height:78%;background:#0d1422;border-top:1px solid var(--border);border-radius:22px 22px 0 0;padding:0 0 20px;overflow-y:auto}
+  .sheet .hd{position:sticky;top:0;background:#0d1422;display:flex;align-items:center;justify-content:space-between;padding:16px 18px 12px;border-bottom:1px solid #161f2e}
+  .sheet .hd .nm{font-size:17px;font-weight:600}
+  .sheet .hd .nm small{display:block;font:500 11px var(--mono);color:var(--lo);margin-top:2px}
+  .sheet .hd .x{color:var(--lo);font-size:13px;cursor:pointer;background:none;border:0}
+  .nowrow{display:flex;align-items:center;gap:18px;padding:16px 18px 8px}
+  .nowrow .big{font:300 46px var(--mono);line-height:1;font-variant-numeric:tabular-nums}
+  .nowrow .meta{display:flex;flex-direction:column;gap:3px;font:600 11px var(--mono);color:var(--lo)}
+  .nowrow .meta b{color:var(--hi);font-weight:600}
+  .nowrow .gustpill{color:var(--gust)}
+  .ranges{display:flex;gap:6px;padding:6px 18px 10px}
+  .ranges button{flex:1;background:var(--panel);border:1px solid var(--border);color:var(--lo);border-radius:999px;padding:7px 0;font:600 12px var(--mono);cursor:pointer}
+  .ranges button.on{background:rgba(52,211,153,.14);border-color:rgba(52,211,153,.4);color:var(--wind)}
+  .chartwrap{padding:4px 14px 0}
+  .legend{display:flex;justify-content:flex-end;gap:14px;padding:6px 18px 0;font:500 10px var(--mono);color:var(--lo)}
+
+  /* bottom tab bar */
+  .tabs{display:flex;border-top:1px solid var(--border);background:var(--bg);flex-shrink:0}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 0;font:500 10px var(--sans);color:var(--xlo)}
+  .tab.active{color:var(--hi)}
+  .tab svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.6}
+</style>
+</head>
+<body>
+
+<!-- ───────── Screen 1: the grid ───────── -->
+<div class="frame" id="grid-screen">
+  <div class="label">Map tab → Live Wind (2×4 grid)</div>
+  <div class="appbar">
+    <div class="title"><span class="badge">SW</span> Live Wind</div>
+    <div class="live"><span class="dot"></span> LIVE</div>
+  </div>
+  <div class="sub">Bay of Palma · 6 stations · updates ~every 10s</div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="tabs">
+    <div class="tab"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v9a1 1 0 001 1h12a1 1 0 001-1v-9"/></svg>Home</div>
+    <div class="tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22"/></svg>Today</div>
+    <div class="tab"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18"/></svg>Week</div>
+    <div class="tab active"><svg viewBox="0 0 24 24"><path d="M2 8 L7 5 L12 8 L17 5 L22 8 V19 L17 22 L12 19 L7 22 L2 19 Z"/><path d="M7 5v17M12 8v11M17 5v17"/></svg>Wind</div>
+    <div class="tab"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="19" cy="12" r="1.4" fill="currentColor"/></svg>More</div>
+  </div>
+
+  <!-- detail sheet -->
+  <div class="scrim" id="scrim" onclick="if(event.target===this)closeSheet()">
+    <div class="sheet">
+      <div class="hd"><div class="nm" id="d-name">Station<small id="d-loc">—</small></div><button class="x" onclick="closeSheet()">Done</button></div>
+      <div class="nowrow">
+        <div class="big" id="d-ws">—</div>
+        <div class="meta">
+          <span>km/h <b id="d-dir">—</b></span>
+          <span class="gustpill">gust <b id="d-gust" style="color:var(--gust)">—</b></span>
+          <span>updated <b id="d-upd">—</b></span>
+        </div>
+      </div>
+      <div class="ranges" id="ranges">
+        <button data-r="1" class="on">1h</button>
+        <button data-r="6">6h</button>
+        <button data-r="12">12h</button>
+        <button data-r="24">24h</button>
+      </div>
+      <div class="chartwrap"><svg id="chart" viewBox="0 0 350 150" width="100%" height="150"></svg></div>
+      <div class="legend"><span style="color:var(--wind)">━ wind</span><span style="color:var(--gust)">┈ gust</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── sample Bay-of-Palma stations (2×3 = 6) ──
+const STATIONS = [
+  {id:'rcnp', name:'Real Club Náutico', loc:'Palma', ws:21, gust:31, dir:194, on:true, up:'now'},
+  {id:'cnarenal',name:'CN s’Arenal', loc:'S’Arenal', ws:20, gust:30, dir:264, on:true, up:'now'},
+  {id:'cmsap',name:'San Antoni', loc:'Can Pastilla', ws:16, gust:24, dir:283, on:true, up:'1m'},
+  {id:'cala-gamba',name:'Cala Gamba', loc:'Palma', ws:14, gust:22, dir:210, on:true, up:'now'},
+  {id:'alcudia',name:'Alcúdiamar', loc:'Alcúdia', ws:9, gust:15, dir:45, on:true, up:'2m'},
+  {id:'colonia',name:'Colònia S. Pere', loc:'Artà', ws:0, gust:0, dir:0, on:false, up:'—'},
+];
+
+function compass(d){return ['N','NE','E','SE','S','SW','W','NW'][Math.round((d%360)/45)%8]}
+// wind colour ramp (km/h) — calm slate → green → yellow → orange → magenta
+function windColor(v){
+  if(v<8) return '#6b7596'; if(v<15) return '#2fd49a'; if(v<22) return '#7fd02a';
+  if(v<30) return '#f0c020'; if(v<40) return '#ee5b2a'; return '#cf3290';
+}
+
+// Proper wind rosette. viewBox 128. Center 64. Ring r=58.
+// 16 ticks (cardinals long, inter-cardinals medium, rest short). N/E/S/W letters.
+// The wind ARROW is a filled triangle riding ON the ring, pointing INWARD toward
+// the centre along the true bearing (where the wind comes FROM). Coloured by speed.
+function rosette(dir, ws, on){
+  const C=64, R=58, col = on? windColor(ws) : '#2a3550';
+  let ticks='';
+  for(let i=0;i<16;i++){
+    const a=i*22.5*Math.PI/180;
+    const card=(i%4===0), inter=(i%2===0);
+    const len = card?9 : inter?6 : 3.5;
+    const r1=R, r2=R-len;
+    const x1=C+Math.sin(a)*r1, y1=C-Math.cos(a)*r1, x2=C+Math.sin(a)*r2, y2=C-Math.cos(a)*r2;
+    ticks+=`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${card?'#46527a':'#2b3656'}" stroke-width="${card?1.5:1}"/>`;
+  }
+  // cardinal letters just inside the ring
+  const lr=R-19;
+  const letter=(t,a)=>{const ra=a*Math.PI/180;return `<text x="${(C+Math.sin(ra)*lr).toFixed(1)}" y="${(C-Math.cos(ra)*lr+3).toFixed(1)}" text-anchor="middle" font-size="8.5" font-weight="700" fill="#5e6a8c" font-family="ui-monospace,monospace">${t}</text>`;};
+  const letters = letter('N',0)+letter('E',90)+letter('S',180)+letter('W',270);
+  // edge arrow: a triangle sitting at the FROM-bearing on the ring, tip pointing inward.
+  // Built pointing up-inward at 12 o'clock, then rotated to `dir`.
+  const arrow = on? `<g transform="rotate(${dir} ${C} ${C})">
+      <path d="M${C} ${C-R+13} L${C-5.5} ${C-R-1} L${C+5.5} ${C-R-1} Z" fill="${col}"/>
+    </g>` : '';
+  return `<svg viewBox="0 0 128 128">
+    <circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="${on?col:'#2a3550'}" stroke-width="1.4" stroke-opacity="${on?.5:.35}"/>
+    ${ticks}${letters}${arrow}
+  </svg>`;
+}
+
+function card(st){
+  const G=st.on?Math.round(st.gust/1.852):0; // kt for the detail vibe; keep km/h primary
+  return `<div class="card ${st.on?'':'off'}" onclick='openSheet(${JSON.stringify(st)})'>
+    <div class="name">${st.name}</div>
+    <div class="place">${st.loc}</div>
+    <div class="rose">
+      ${rosette(st.dir, st.ws, st.on)}
+      <div class="readout">
+        <div class="ws">${st.on?st.ws:'—'}</div>
+        <div class="unit">${st.on?'KM/H · '+compass(st.dir):'OFFLINE'}</div>
+      </div>
+    </div>
+    <div class="foot">
+      ${st.on
+        ? `<span class="g">gust <b>${st.gust}</b></span><span class="sep"></span><span class="age"><span class="ld"></span>${st.up}</span>`
+        : `<span>no signal</span>`}
+    </div>
+  </div>`;
+}
+document.getElementById('grid').innerHTML = STATIONS.map(card).join('');
+
+// ── detail sheet + chart ──
+let curRange=1, curStation=null;
+function openSheet(st){
+  curStation=st;
+  document.getElementById('d-name').firstChild.textContent=st.name;
+  document.getElementById('d-loc').textContent=st.loc.toUpperCase();
+  document.getElementById('d-ws').textContent=st.on?st.ws:'—';
+  document.getElementById('d-ws').style.color=windColor(st.ws);
+  document.getElementById('d-dir').textContent=st.on?compass(st.dir)+' '+st.dir+'°':'—';
+  document.getElementById('d-gust').textContent=st.on?st.gust+' km/h':'—';
+  document.getElementById('d-upd').textContent=st.up;
+  curRange=1; setRange(1);
+  document.getElementById('scrim').classList.add('open');
+}
+function closeSheet(){document.getElementById('scrim').classList.remove('open')}
+document.querySelectorAll('#ranges button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#ranges button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); setRange(+b.dataset.r);
+});
+function setRange(r){
+  curRange=r;
+  // synth a wind+gust series around the station's current value
+  const n = r===1?60:r===6?72:r===12?72:96;
+  const base = curStation?curStation.ws:15;
+  const pts=[]; let w=base;
+  for(let i=0;i<n;i++){ w += (Math.random()-0.5)*3; w=Math.max(2,Math.min(45,w)); pts.push(w) }
+  // smooth toward current at the end
+  drawChart(pts, pts.map(v=>v+3+Math.random()*5));
+}
+function drawChart(wind, gust){
+  const W=350,H=150,pl=24,pr=8,pt=8,pb=18, iw=W-pl-pr, ih=H-pt-pb;
+  const max=Math.max(20,...gust)*1.1;
+  const x=i=>pl+i/(wind.length-1)*iw, y=v=>pt+ih-v/max*ih;
+  const line=a=>a.map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const area=`M ${pl},${pt+ih} `+gust.map((v,i)=>`L ${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')+` L ${pl+iw},${pt+ih} Z`;
+  let grid='';
+  for(let v=10;v<max;v+=10){ grid+=`<line x1="${pl}" y1="${y(v)}" x2="${W-pr}" y2="${y(v)}" stroke="#15202e"/><text x="${pl-4}" y="${y(v)+3}" text-anchor="end" font-size="8" fill="#5a6577" font-family="monospace">${v}</text>` }
+  document.getElementById('chart').innerHTML = `
+    <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#7fd02a" stop-opacity=".3"/><stop offset="100%" stop-color="#7fd02a" stop-opacity="0"/></linearGradient></defs>
+    ${grid}
+    <path d="${area}" fill="url(#g)"/>
+    <polyline points="${line(gust)}" fill="none" stroke="#7fd02a" stroke-width="1" stroke-opacity=".7" stroke-dasharray="3 2"/>
+    <polyline points="${line(wind)}" fill="none" stroke="#34d399" stroke-width="1.8"/>`;
+}
+</script>
+</body>
+</html>

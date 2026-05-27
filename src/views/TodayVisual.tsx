@@ -8,7 +8,6 @@
 import type { WeatherConditions } from '@/types/weather';
 import { WeatherBackdrop } from '@/components/WeatherBackdrop';
 import { WxIcon } from '@/components/WxIcon';
-import { WindHistoryChart } from '@/components/WindHistoryChart';
 import { compass, fmtDuration, fmtTime, localHour, uvLabel } from '@/utils/format';
 
 function nearestHourIndex(hours: { time: Date }[], now: number): number {
@@ -135,22 +134,6 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
           <Metric label="Humidity" value={`${current.humidity}`} unit="%" />
           <Metric label="UV" value={`${uv}`} unit={uvLabel(uv)} />
         </div>
-
-        {/* Live wind sparkline (last hour) — only when a live station is present */}
-        {weather.windHistory && weather.windHistory.hour.length > 1 && (
-          <div className="mx-4 mb-1 rounded-xl border border-[#1d2533] bg-[#101826] px-3 py-2">
-            <div className="mb-0.5 flex items-center justify-between">
-              <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold tracking-wide text-neutral-400">
-                WIND · LAST HOUR
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-              </span>
-              <span className="font-mono text-[10px] text-neutral-500">
-                <span className="text-emerald-400">━</span> wind <span className="ml-1.5 text-[#7fd02a]">┄</span> gust
-              </span>
-            </div>
-            <WindHistoryChart points={weather.windHistory.hour} tz={tz} height={56} sparkline />
-          </div>
-        )}
 
         {/* Sun arc */}
         <SunArc sunrise={sun.sunrise} sunset={sun.sunset} tz={tz} nowMs={nowMs} />

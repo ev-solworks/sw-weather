@@ -1,0 +1,172 @@
+<!doctype html>
+<!-- MOCKUP — wind rosette VARIATIONS. Same station (rcnp: 21 kt-ish, from 194°/S,
+     gust 31) rendered 6 ways so we can pick a direction. knots default + kt/kmh
+     toggle. Wind angle shown. Throwaway for design sign-off. -->
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Rosette variations</title>
+<style>
+  :root{
+    --bg:#0a0f1c; --panel:#0c1428; --border:#1b2440; --hi:#fafafa; --lo:#8a93a8; --xlo:#5a6480;
+    --wind:#34d399; --gust:#7fd02a; --mono:"JetBrains Mono",ui-monospace,monospace; --sans:"Inter",-apple-system,system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#05070d;font-family:var(--sans);color:var(--hi);padding:26px;display:flex;flex-direction:column;align-items:center;gap:18px}
+  .bar{display:flex;align-items:center;gap:14px}
+  .bar h1{font:600 16px var(--sans)}
+  .bar .desc{font-size:12px;color:var(--lo)}
+  .toggle{display:flex;border:1px solid var(--border);border-radius:999px;overflow:hidden;font:600 12px var(--mono)}
+  .toggle button{background:var(--panel);color:var(--lo);border:0;padding:7px 16px;cursor:pointer}
+  .toggle button.on{background:rgba(52,211,153,.16);color:var(--wind)}
+  .gallery{display:grid;grid-template-columns:repeat(3,200px);gap:16px}
+  .cell{border:1px solid var(--border);background:radial-gradient(130% 110% at 50% -10%, #13213c 0%, var(--panel) 68%);border-radius:20px;padding:14px 10px 13px;display:flex;flex-direction:column;align-items:center}
+  .cell .vname{font:600 10px var(--mono);color:var(--xlo);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px}
+  .cell .name{font:600 12.5px var(--sans);color:var(--hi)}
+  .cell .place{font:500 8.5px var(--mono);color:var(--xlo);letter-spacing:.4px;text-transform:uppercase;margin-top:2px}
+  .rose{position:relative;width:132px;height:132px;margin:10px 0 2px}
+  .rose svg{position:absolute;inset:0}
+  .readout{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .readout .ws{font:250 40px var(--mono);line-height:.9;font-variant-numeric:tabular-nums;letter-spacing:-1px}
+  .readout .unit{font:600 8px var(--mono);color:var(--lo);letter-spacing:1.2px;margin-top:4px}
+  .readout .ang{font:600 9px var(--mono);color:var(--lo);margin-top:2px;font-variant-numeric:tabular-nums}
+  .foot{display:flex;align-items:center;gap:7px;margin-top:9px;font:600 11px var(--mono);font-variant-numeric:tabular-nums}
+  .foot .g b{color:var(--gust)}
+  .foot .sep{width:3px;height:3px;border-radius:50%;background:var(--border)}
+  .foot .age{color:var(--xlo)}
+</style>
+</head>
+<body>
+  <div class="bar">
+    <h1>Wind rosette — pick a style</h1>
+    <span class="desc">same station, 6 variations</span>
+    <div class="toggle" id="unitToggle">
+      <button data-u="kt" class="on">knots</button>
+      <button data-u="kmh">km/h</button>
+    </div>
+  </div>
+  <div class="gallery" id="gallery"></div>
+
+<script>
+// station sample — store SI-ish in knots; convert for display
+const ST = {name:'Real Club Náutico', loc:'Palma', kt:21, gustKt:31, dir:194};
+let unit='kt';
+const conv = v => unit==='kt'? v : Math.round(v*1.852);
+const unitLabel = ()=> unit==='kt'?'KN':'KM/H';
+function compass(d){return ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][Math.round((d%360)/22.5)%16]}
+function windColor(kt){ // ramp in knots
+  if(kt<5) return '#6b7596'; if(kt<10) return '#2fd49a'; if(kt<15) return '#7fd02a';
+  if(kt<20) return '#f0c020'; if(kt<27) return '#ee5b2a'; return '#cf3290';
+}
+const C=66; // center for viewBox 132
+
+// helpers
+function ticks(R, opts={}){
+  let out='';
+  for(let i=0;i<16;i++){
+    const a=i*22.5*Math.PI/180, card=i%4===0, inter=i%2===0;
+    const len=card?(opts.cardLen??9):inter?6:3.5, r2=R-len;
+    const x1=C+Math.sin(a)*R, y1=C-Math.cos(a)*R, x2=C+Math.sin(a)*r2, y2=C-Math.cos(a)*r2;
+    out+=`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${card?(opts.cardCol??'#46527a'):(opts.col??'#2b3656')}" stroke-width="${card?1.5:1}"/>`;
+  }
+  return out;
+}
+function letters(R){
+  const lr=R-15;const L=(t,a)=>{const ra=a*Math.PI/180;return `<text x="${(C+Math.sin(ra)*lr).toFixed(1)}" y="${(C-Math.cos(ra)*lr+3).toFixed(1)}" text-anchor="middle" font-size="8" font-weight="700" fill="#5e6a8c" font-family="monospace">${t}</text>`};
+  return L('N',0)+L('E',90)+L('S',180)+L('W',270);
+}
+function arc(cx,cy,r,a0,a1){ // svg arc path between two angles (deg, 0=N clockwise)
+  const p=(a)=>{const ra=(a-90)*Math.PI/180;return [cx+r*Math.cos(ra), cy+r*Math.sin(ra)]};
+  const [x0,y0]=p(a0),[x1,y1]=p(a1); const large=((a1-a0+360)%360)>180?1:0;
+  return `M ${x0.toFixed(1)} ${y0.toFixed(1)} A ${r} ${r} 0 ${large} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+}
+
+// ── 6 rosette renderers (dir = FROM bearing) ──
+const VARIANTS = {
+
+// A — Bold gradient sweep: thick track + colored arc centred on the wind bearing,
+// with a large pointer pulled slightly outside the ring on the bearing.
+'A · Sweep'(dir,kt){const col=windColor(kt);
+  return `<svg viewBox="0 0 132 132">
+    <circle cx="${C}" cy="${C}" r="56" fill="none" stroke="#222d44" stroke-width="6"/>
+    <path d="${arc(C,C,56,dir-44,dir+44)}" fill="none" stroke="${col}" stroke-width="6" stroke-linecap="round"/>
+    ${letters(46)}
+    <g transform="rotate(${dir} ${C} ${C})">
+      <path d="M${C} ${C-48} L${C-10} ${C-67} L${C+10} ${C-67} Z" fill="${col}"/>
+    </g>
+  </svg>`;},
+
+// B — Compass star rose (8-point petals) behind, arrow head on bearing.
+'B · Star rose'(dir,kt){const col=windColor(kt);let pet='';
+  for(let i=0;i<8;i++){const a=i*45;const ra=a*Math.PI/180;const long=i%2===0;const r=long?56:34;
+    const tip=[C+Math.sin(ra)*r, C-Math.cos(ra)*r];const b1=[C+Math.sin(ra+0.18)*13, C-Math.cos(ra+0.18)*13];const b2=[C+Math.sin(ra-0.18)*13, C-Math.cos(ra-0.18)*13];
+    pet+=`<path d="M${tip[0].toFixed(1)} ${tip[1].toFixed(1)} L${b1[0].toFixed(1)} ${b1[1].toFixed(1)} L${b2[0].toFixed(1)} ${b2[1].toFixed(1)} Z" fill="${long?'#1c2742':'#162038'}" stroke="#26314d" stroke-width=".5"/>`;}
+  return `<svg viewBox="0 0 132 132">${pet}
+    <g transform="rotate(${dir} ${C} ${C})"><path d="M${C} 8 L${C-7} 30 L${C} 24 L${C+7} 30 Z" fill="${col}"/></g>
+    ${letters(60)}</svg>`;},
+
+// C — Filled direction wedge (sector pie) from centre toward the bearing.
+'C · Wedge'(dir,kt){const col=windColor(kt);const ra0=(dir-22-90)*Math.PI/180,ra1=(dir+22-90)*Math.PI/180,r=58;
+  const x0=C+r*Math.cos(ra0),y0=C+r*Math.sin(ra0),x1=C+r*Math.cos(ra1),y1=C+r*Math.sin(ra1);
+  return `<svg viewBox="0 0 132 132">
+    <circle cx="${C}" cy="${C}" r="58" fill="none" stroke="#222d44" stroke-width="1.2"/>
+    <path d="M${C} ${C} L${x0.toFixed(1)} ${y0.toFixed(1)} A 58 58 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)} Z" fill="${col}" fill-opacity=".22" stroke="${col}" stroke-width="1"/>
+    ${ticks(58)}${letters(58)}</svg>`;},
+
+// D — Gauge: ring fills proportional to speed (0–35kt), plus a dot marker at bearing.
+'D · Gauge'(dir,kt){const col=windColor(kt);const frac=Math.min(1,kt/35);const circ=2*Math.PI*54;
+  const mr=54,ra=(dir)*Math.PI/180,mx=C+Math.sin(ra)*mr,my=C-Math.cos(ra)*mr;
+  return `<svg viewBox="0 0 132 132">
+    <circle cx="${C}" cy="${C}" r="54" fill="none" stroke="#1c2742" stroke-width="5"/>
+    <circle cx="${C}" cy="${C}" r="54" fill="none" stroke="${col}" stroke-width="5" stroke-linecap="round"
+       stroke-dasharray="${(circ*frac).toFixed(1)} ${circ.toFixed(1)}" transform="rotate(-90 ${C} ${C})"/>
+    <circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="5" fill="${col}" stroke="#0a0f1c" stroke-width="2"/>
+    ${letters(40)}</svg>`;},
+
+// E — Heavy ring + big edge arrow (the current style, but thicker/bolder, no thin green line).
+'E · Bold edge'(dir,kt){const col=windColor(kt);
+  return `<svg viewBox="0 0 132 132">
+    <circle cx="${C}" cy="${C}" r="58" fill="none" stroke="#2a3656" stroke-width="3"/>
+    ${ticks(58,{col:'#2b3656',cardCol:'#46527a'})}${letters(58)}
+    <g transform="rotate(${dir} ${C} ${C})"><path d="M${C} ${C-58+15} L${C-7} ${C-58-2} L${C+7} ${C-58-2} Z" fill="${col}"/></g>
+  </svg>`;},
+
+// F — Dual arrows + dashed bearing ring (from-arrow solid, to-arrow ghost), airy.
+'F · Bearing line'(dir,kt){const col=windColor(kt);
+  return `<svg viewBox="0 0 132 132">
+    <circle cx="${C}" cy="${C}" r="58" fill="none" stroke="#222d44" stroke-width="1" stroke-dasharray="1.5 4"/>
+    ${letters(58)}
+    <g transform="rotate(${dir} ${C} ${C})">
+      <line x1="${C}" y1="14" x2="${C}" y2="${C}" stroke="${col}" stroke-width="2"/>
+      <path d="M${C} 9 L${C-6} 22 L${C+6} 22 Z" fill="${col}"/>
+    </g>
+  </svg>`;},
+};
+
+function render(){
+  const g=document.getElementById('gallery'); g.innerHTML='';
+  for(const [label,fn] of Object.entries(VARIANTS)){
+    const col=windColor(ST.kt);
+    g.insertAdjacentHTML('beforeend', `<div class="cell">
+      <div class="vname">${label}</div>
+      <div class="name">${ST.name}</div><div class="place">${ST.loc}</div>
+      <div class="rose">${fn(ST.dir,ST.kt)}
+        <div class="readout">
+          <div class="ws" style="color:${col}">${conv(ST.kt)}</div>
+          <div class="unit">${unitLabel()} · ${compass(ST.dir)}</div>
+          <div class="ang">${ST.dir}°</div>
+        </div>
+      </div>
+      <div class="foot"><span class="g">gust <b>${conv(ST.gustKt)}</b></span><span class="sep"></span><span class="age">● now</span></div>
+    </div>`);
+  }
+}
+document.querySelectorAll('#unitToggle button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#unitToggle button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); unit=b.dataset.u; render();
+});
+render();
+</script>
+</body>
+</html>

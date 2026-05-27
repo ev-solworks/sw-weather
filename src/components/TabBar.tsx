@@ -52,12 +52,13 @@ const TABS: TabDef[] = [
   },
   {
     key: 'map',
-    label: 'Map',
-    enabled: false,
-    icon: () => (
-      <svg width="22" height="22" viewBox="0 0 24 24" {...stroke}>
-        <path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z" />
-        <path d="M9 4v14M15 6v14" />
+    label: 'Wind',
+    enabled: true,
+    icon: (a) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" {...stroke} fill={a ? 'currentColor' : 'none'} fillOpacity={a ? 0.15 : 0}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
+        <path d="M12 12 L15 6" strokeWidth="2" />
       </svg>
     ),
   },
