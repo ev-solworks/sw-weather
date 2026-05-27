@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { useNav, type TodaySubView } from '@/app/navigation';
 import { useWeather } from '@/hooks/useWeather';
 import { TodayVisual } from '@/views/TodayVisual';
+import { TodaySun } from '@/views/TodaySun';
 import { ComingSoon } from '@/views/ComingSoon';
 import { LocationSwitcher } from '@/components/LocationSwitcher';
 
@@ -15,7 +16,7 @@ const SUB_VIEWS: { key: TodaySubView; label: string; enabled: boolean }[] = [
   { key: 'visual', label: 'Visual', enabled: true },
   { key: 'windguru', label: 'Windguru', enabled: false },
   { key: 'graph', label: 'Graph', enabled: false },
-  { key: 'sun', label: 'Sun', enabled: false },
+  { key: 'sun', label: 'Sun', enabled: true },
 ];
 
 export function TodayView() {
@@ -55,9 +56,9 @@ export function TodayView() {
                 Showing last known forecast (offline)
               </div>
             )}
-            {todaySub === 'visual' ? (
-              <TodayVisual weather={data} onOpenSwitcher={() => setSwitcherOpen(true)} />
-            ) : (
+            {todaySub === 'visual' && <TodayVisual weather={data} onOpenSwitcher={() => setSwitcherOpen(true)} />}
+            {todaySub === 'sun' && <TodaySun weather={data} />}
+            {(todaySub === 'windguru' || todaySub === 'graph') && (
               <ComingSoon title={`Today · ${SUB_VIEWS.find((s) => s.key === todaySub)?.label}`} />
             )}
           </>
