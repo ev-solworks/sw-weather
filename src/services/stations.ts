@@ -154,4 +154,12 @@ export function fmtSpeed(kt: number, unit: WindUnit): string {
   const v = toUnit(kt, unit);
   return Number.isInteger(v) ? String(v) : v.toFixed(1);
 }
+
+/** Split a speed into integer + decimal parts for tighter rendering of the `.x`. */
+export function splitSpeed(kt: number, unit: WindUnit): { int: string; dec: string | null } {
+  const v = toUnit(kt, unit);
+  if (Number.isInteger(v)) return { int: String(v), dec: null };
+  const [int, dec] = v.toFixed(1).split('.');
+  return { int, dec };
+}
 export const unitLabel = (u: WindUnit): string => (u === 'kt' ? 'KN' : 'KM/H');

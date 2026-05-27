@@ -15,6 +15,7 @@ import {
   fetchStationHistory,
   fetchStationRegistry,
   fmtSpeed,
+  splitSpeed,
   loadWindUnit,
   saveWindUnit,
   toUnit,
@@ -115,6 +116,22 @@ export function WindView() {
   );
 }
 
+/**
+ * Hero wind number. Integer part big (tabular so it doesn't jiggle as it ticks);
+ * the .x rendered small and pulled in tight to kill the wide mono decimal gap.
+ */
+function WindNumber({ kt, unit, color, big = 42 }: { kt: number; unit: WindUnit; color: string; big?: number }) {
+  const { int, dec } = splitSpeed(kt, unit);
+  return (
+    <div className="flex items-baseline font-mono font-extralight leading-[.85]" style={{ color }}>
+      <span className="tabular-nums" style={{ fontSize: big, letterSpacing: '-0.04em' }}>{int}</span>
+      {dec != null && (
+        <span className="tabular-nums font-light" style={{ fontSize: big * 0.5, marginLeft: '-0.04em' }}>.{dec}</span>
+      )}
+    </div>
+  );
+}
+
 function UnitToggle({ unit, onChange }: { unit: WindUnit; onChange: (u: WindUnit) => void }) {
   return (
     <div className="flex overflow-hidden rounded-full border border-[#1b2440] font-mono text-[11px] font-semibold">
@@ -150,9 +167,13 @@ function StationCard({ meta, reading, unit, onOpen }: { meta: StationMeta; readi
         <WindRosette dir={reading?.dir ?? 0} windKt={reading?.windKt ?? 0} online={online} size={150} />
         {/* center stack: wind (hero) + gust (smaller, below, inside) */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div className="font-mono text-[42px] font-extralight leading-[.85] tracking-tight tabular-nums" style={{ color: col }}>
-            {online ? fmtSpeed(reading!.windKt, unit) : loading ? '·' : '—'}
-          </div>
+          {online ? (
+            <WindNumber kt={reading!.windKt} unit={unit} color={col} />
+          ) : (
+            <div className="font-mono text-[42px] font-extralight leading-[.85] tracking-tight" style={{ color: col }}>
+              {loading ? '·' : '—'}
+            </div>
+          )}
           {online && reading!.gustKt != null && (
             <div className="mt-1.5 font-mono text-[12px] font-semibold tabular-nums text-[#7fd02a]">
               <span className="text-[9px] font-medium text-neutral-500">G</span> {fmtSpeed(reading!.gustKt, unit)}
@@ -218,9 +239,11 @@ function StationDetail({ meta, reading, unit, onClose }: { meta: StationMeta | n
         </div>
 
         <div className="flex items-center gap-[18px] px-[18px] pb-2 pt-4">
-          <div className="font-mono text-[46px] font-extralight leading-none tabular-nums" style={{ color: col }}>
-            {online ? fmtSpeed(reading!.windKt, unit) : '—'}
-          </div>
+          {online ? (
+            <WindNumber kt={reading!.windKt} unit={unit} color={col} big={46} />
+          ) : (
+            <div className="font-mono text-[46px] font-extralight leading-none" style={{ color: col }}>—</div>
+          )}
           <div className="flex flex-col gap-[3px] font-mono text-[11px] font-semibold text-neutral-500">
             <span>{unitLabel(unit)} <b className="text-neutral-50">{online ? `${compass(reading!.dir)} ${reading!.dir}°` : '—'}</b></span>
             <span className="text-[#7fd02a]">gust <b className="text-[#7fd02a]">{online && reading!.gustKt != null ? `${fmtSpeed(reading!.gustKt, unit)} ${unitLabel(unit).toLowerCase()}` : '—'}</b></span>
