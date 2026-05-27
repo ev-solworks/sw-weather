@@ -11,6 +11,7 @@
 import { memo, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import type { HourForecast, WeatherConditions } from '@/types/weather';
 import { WxIcon } from '@/components/WxIcon';
+import { WatersportsSummary } from '@/components/WatersportsSummary';
 import { localHour } from '@/utils/format';
 import {
   cloudScale,
@@ -72,6 +73,8 @@ export function TodayWindguru({ weather }: { weather: WeatherConditions }) {
         <span className="text-[11px] font-medium text-neutral-500">{location.region}</span>
         <span className="ml-auto font-mono text-[10px] text-neutral-600">{hours.length}h forecast</span>
       </div>
+
+      <WatersportsSummary weather={weather} />
 
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
         {/* Header row */}

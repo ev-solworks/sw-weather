@@ -62,8 +62,12 @@ Get real, normalized `WeatherConditions` for one location before any view work.
 - [x] **`WeekView`** — summary tiles (week hi/lo, peak rain; wave tile only when a day has waves), shared temp scale, per-day gradient range bars + today's current-temp marker, rain/wind/wave chips. Nullable marine handled honestly (no faked zeros). Verified in browser. (Added `stampTodayCurrent` in normalize.)
 - [x] **`TodaySun`** (twilight bands, golden hour arc, phase list, moon disc) — see Stage-4 entry above.
 - [x] **`TodayWindguru`** — dense color-coded hourly table; sticky label column + sync-scrolling rows; memoized cells; auto-scroll to now; per-metric ramps in `scales/wgScales.ts`. Marine rows show honest dots when no wave data. Legend strip. Verified for Palma. **Surfaced:** AEMET hourly has no per-hour cloud%/UV → those rows are dots for ES locations (PT/Open-Meteo populates them). Possible follow-up: backfill ES hourly cloud/UV from Open-Meteo.
-- [ ] `TodayGraph` (SVG panels; memoize paths)
-- [ ] Details view incl. **marine/watersports block** (waves/period/dir/SST, confidence badge)
+- [x] **`TodayGraph`** — 5 sync-scrolling SVG panels (temp area, wind bars+gusts+arrows, rain area+precip bars, wave area+period+arrows [hidden if no waves], cloud bars); now-guide, day/night shading, memoized panels. Verified for Palma.
+- [x] **Marine/watersports** — fulfilled by Windguru (the "details" view per user) marine rows + Graph wave panel, PLUS a `WatersportsSummary` header on Windguru: plain-language sea state ("0.1m @ 4s · short wind-chop from SE"), wind-vs-wave alignment, sea temp, and the **source/confidence badge** ("MODEL ESTIMATE · MEDIUM" for ES / "IPMA OFFICIAL · HIGH" for PT) — first surfacing of the provenance differentiator. Verified for Palma.
+
+**Stage 4 complete.** All 6 design views + the watersports summary are built and verified in-browser.
+
+**Cold-load polish follow-up:** on a fresh page load, Home fetches 5 locations and Today re-fetches the active one (separate `useWeather` instances share the cache but not in-flight requests) → duplicate fetch, slow first paint under the AEMET throttle. Add request de-duplication (in-flight promise map) keyed by `{source}:{kind}:{locationId}`. Polish, not correctness.
 
 **Resilience follow-up (noted 2026-05-27):** hit a transient AEMET `ConnectTimeoutError` in testing → a cold load with nothing cached dead-ends at "Couldn't load." Stale-cache fallback only helps after a first success. Consider retry-on-mount with backoff and/or partial render (show IPMA/OM even if AEMET times out). AEMET OpenData is intermittently slow.
 
