@@ -88,6 +88,19 @@ Get real, normalized `WeatherConditions` for one location before any view work.
 
 ---
 
+## Live wind stations (future feature)
+A dedicated page: map of live measured stations (à la **wynd.live** — kitesurf/wingfoil
+aggregator, Mediterranean/Mallorca, live wind+gust+direction, community-rated spots)
+with live readings + the wind/gust history graph already built.
+- **Source mining:** wynd.live aggregates stations we may want — inspect its network
+  calls / station list to find the underlying feeds (it blocks server-side scraping;
+  check in a real browser's devtools). Likely overlaps OceanDrivers + others.
+- Infrastructure already in place: OceanDrivers live + history through the proxy,
+  `windHistory` on the type, `WindHistoryChart` component, `oceandrivers_station`
+  column. Extending to more stations = add rows + (maybe) a stations table/map.
+- **Record our own history** (longer retention than OceanDrivers' hour/day) when this
+  lands: the cron already fetches; add a time-series table + retention.
+
 ## Deferred / open
 - **Tides** — no free keyless source. StormGlass free (10/day, hard-cache) if watersports needs it. Flagged.
 - **AEMET marine text** — show OM Marine numbers + link to AEMET bulletin rather than parsing the Spanish text (Phase-1 recommendation).

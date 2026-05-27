@@ -26,6 +26,8 @@ const TTL: Record<WeatherKind, number> = {
   'om-forecast': 1 * 3600_000,
   'om-marine': 1 * 3600_000,
   'om-aq': 1 * 3600_000,
+  'oceandrivers': 5 * 60_000,
+  'oceandrivers-history': 10 * 60_000,
 };
 
 Deno.serve(async (req) => {

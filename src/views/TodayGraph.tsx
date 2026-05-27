@@ -8,10 +8,11 @@
  * wave data. Each panel is memoized so scroll re-renders stay cheap.
  */
 
-import { memo, useCallback, useEffect, useRef, type ReactNode } from 'react';
-import type { HourForecast, WeatherConditions } from '@/types/weather';
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import type { HourForecast, WeatherConditions, WindHistory } from '@/types/weather';
 import { localHour } from '@/utils/format';
 import { cloudScale, windScale } from '@/scales/wgScales';
+import { WindHistoryChart } from '@/components/WindHistoryChart';
 
 const HOUR_W = 28;
 
@@ -64,6 +65,7 @@ export function TodayGraph({ weather }: { weather: WeatherConditions }) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+        {weather.windHistory && <LiveWindPanel history={weather.windHistory} tz={tz} />}
         <TimeAxis hours={hours} tz={tz} flags={flags} register={register} onScroll={onScroll} totalW={totalW} />
         <Panel title="Temperature" unit="°C" totalW={totalW} height={90} flags={flags} nowIdx={nowIdx} register={register} onScroll={onScroll}>
           {(innerH) => <TempPanel hours={hours} innerH={innerH} />}
@@ -82,6 +84,39 @@ export function TodayGraph({ weather }: { weather: WeatherConditions }) {
         <Panel title="Cloud cover" unit="%" totalW={totalW} height={50} flags={flags} nowIdx={nowIdx} register={register} onScroll={onScroll} last>
           {(innerH) => <CloudPanel hours={hours} innerH={innerH} />}
         </Panel>
+      </div>
+    </div>
+  );
+}
+
+/** Live measured wind/gust from a station (OceanDrivers), with hour/24h toggle. */
+function LiveWindPanel({ history, tz }: { history: WindHistory; tz: string }) {
+  const [range, setRange] = useState<'hour' | 'day'>('hour');
+  const points = range === 'hour' ? history.hour : history.day;
+  return (
+    <div className="border-b border-[#141d2a] bg-[#0a1326] px-3.5 py-3">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold tracking-wide text-emerald-300/80">
+          LIVE WIND · MEASURED
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+        </span>
+        <div className="flex gap-1">
+          {(['hour', 'day'] as const).map((r) => (
+            <button
+              key={r}
+              onClick={() => setRange(r)}
+              className={`rounded-full px-2 py-0.5 font-mono text-[10px] ${range === r ? 'bg-white/10 text-neutral-50' : 'text-neutral-500'}`}
+            >
+              {r === 'hour' ? '1h' : '24h'}
+            </button>
+          ))}
+        </div>
+      </div>
+      <WindHistoryChart points={points} tz={tz} height={120} />
+      <div className="mt-1 flex justify-end gap-3 font-mono text-[9px] text-neutral-500">
+        <span><span className="text-emerald-400">━</span> wind</span>
+        <span><span className="text-[#7fd02a]">┄</span> gust</span>
+        <span className="text-neutral-600">km/h</span>
       </div>
     </div>
   );

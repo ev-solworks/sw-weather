@@ -23,6 +23,8 @@ import type {
   SourceId,
   SourceMap,
   WeatherConditions,
+  WindHistory,
+  WindHistoryPoint,
 } from '@/types/weather';
 import {
   aemetSkyToCondition,
@@ -35,7 +37,7 @@ import * as aemet from '@/services/aemet';
 import * as ipma from '@/services/ipma';
 import * as om from '@/services/openMeteo';
 import { computeMoonInfo, computeSunPhases } from '@/services/sun';
-import { fetchFromProxy, type OceanDriversLive, type ProxyPayloads } from '@/services/proxy';
+import { fetchFromProxy, type OceanDriversHistory, type OceanDriversLive, type OceanDriversSeries, type ProxyPayloads } from '@/services/proxy';
 
 function prov(source: SourceId, confidence: Confidence, model?: string): FieldProvenance {
   return { source, confidence, model, fetchedAt: new Date().toISOString() };
@@ -145,6 +147,37 @@ function parseAemetObs(payload: unknown): { ta: number | null; hr: number | null
 
 const KNOTS_TO_KMH = 1.852;
 
+/** Zip an OceanDrivers series ({"0":v,…} parallel objects) into WindHistoryPoint[]. */
+function parseWindSeries(series: OceanDriversSeries | null | undefined): WindHistoryPoint[] {
+  if (!series?.TIME || !series.TWS) return [];
+  const n = series.length ?? Object.keys(series.TIME).length;
+  const pts: WindHistoryPoint[] = [];
+  for (let i = 0; i < n; i++) {
+    const k = String(i);
+    const t = series.TIME[k];
+    const ws = series.TWS[k];
+    if (t == null || ws == null) continue;
+    const gust = series.TWS_GUST?.[k];
+    const dir = series.TWD?.[k];
+    pts.push({
+      time: new Date(t),
+      windSpeed: Math.round(ws * KNOTS_TO_KMH),
+      windGust: gust != null ? Math.round(gust * KNOTS_TO_KMH) : null,
+      windDirection: dir != null ? Math.round(dir) : null,
+    });
+  }
+  return pts;
+}
+
+/** Build WindHistory from the oceandrivers-history payload, or undefined. */
+function parseWindHistory(h: OceanDriversHistory | undefined): WindHistory | undefined {
+  if (!h) return undefined;
+  const hour = parseWindSeries(h.hour);
+  const day = parseWindSeries(h.day);
+  if (!hour.length && !day.length) return undefined;
+  return { source: 'oceandrivers', hour, day };
+}
+
 /** Parse an OceanDrivers live reading → measured wind in km/h. Null if inactive/absent. */
 function parseOceanDrivers(
   od: OceanDriversLive | undefined,
@@ -233,8 +266,9 @@ async function normalizeSpain(loc: Location, p: ProxyPayloads): Promise<WeatherC
     current = { ...current, windSpeed: live.windSpeed, windDirection: live.windDirection, windGust: live.windGust ?? current.windGust, observedAt: live.observedAt ?? current.observedAt };
     sources.wind = prov('oceandrivers', 'high', live.station);
   }
+  const windHistory = parseWindHistory(p['oceandrivers-history']);
 
-  return { location: loc, current, hours, days, sun, moon, alerts: [], sources, assembledAt: new Date().toISOString() };
+  return { location: loc, current, hours, days, sun, moon, alerts: [], sources, windHistory, assembledAt: new Date().toISOString() };
 }
 
 async function normalizePortugal(loc: Location, p: ProxyPayloads): Promise<WeatherConditions> {

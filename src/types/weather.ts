@@ -256,6 +256,24 @@ export interface Location {
 // Top-level bundle
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** One point of measured wind history (from a live station). Speeds in km/h. */
+export interface WindHistoryPoint {
+  time: Date;
+  windSpeed: number;
+  windGust: number | null;
+  windDirection: number | null;
+}
+
+/**
+ * Measured wind/gust history from a live station (e.g. OceanDrivers). Present only
+ * for locations with a live station. `hour` = last 60 min (1-min); `day` = last 24h.
+ */
+export interface WindHistory {
+  source: SourceId;
+  hour: WindHistoryPoint[];
+  day: WindHistoryPoint[];
+}
+
 /**
  * The normalized weather bundle for one location — the output of the normalize
  * layer and the input to the view hooks. Views consume the slice they need.
@@ -272,6 +290,8 @@ export interface WeatherConditions {
   moon: MoonInfo;
   alerts: WeatherAlert[];
   sources: SourceMap;
+  /** Live measured wind history (present only when a live station is configured). */
+  windHistory?: WindHistory;
   /** ISO instant this bundle was assembled (for the "updated X ago" line). */
   assembledAt: string;
 }

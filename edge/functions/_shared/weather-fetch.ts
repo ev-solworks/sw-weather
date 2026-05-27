@@ -15,7 +15,8 @@ export type WeatherKind =
   | 'om-forecast'
   | 'om-marine'
   | 'om-aq'
-  | 'oceandrivers';
+  | 'oceandrivers'
+  | 'oceandrivers-history';
 
 export interface LocationRow {
   id: string;
@@ -140,6 +141,18 @@ export async function oceanDriversLive(stationId: string): Promise<unknown> {
   if (!res.ok) throw new Error(`OceanDrivers ${stationId} ${res.status}`);
   return res.json();
 }
+/**
+ * Time-series history: ?period=latesthour → 60 pts @1min; latestday → 24 pts @1h.
+ * Each series is {TIME, TWS, TWS_GUST, TWD} as {"0":v,...} objects. Returns both.
+ */
+export async function oceanDriversHistory(stationId: string): Promise<unknown> {
+  const get = async (period: string) => {
+    const res = await timedFetch(`${OD_BASE}/getWeatherDisplay/${stationId}/?period=${period}`).catch(() => null);
+    return res && res.ok ? res.json() : null;
+  };
+  const [hour, day] = await Promise.all([get('latesthour'), get('latestday')]);
+  return { hour, day };
+}
 
 function haversine(la1: number, lo1: number, la2: number, lo2: number): number {
   const R = 6371, toRad = (x: number) => (x * Math.PI) / 180;
@@ -162,8 +175,11 @@ export async function fetchAllForLocation(
   const run = (kind: WeatherKind, p: Promise<unknown>) =>
     tasks.push(p.then((v) => void (out[kind] = v)).catch(() => void (out[kind] = null)));
 
-  // Live station (any country) — measured current wind for the Bay of Palma.
-  if (loc.oceandrivers_station) run('oceandrivers', oceanDriversLive(loc.oceandrivers_station));
+  // Live station (any country) — measured current wind + wind/gust history.
+  if (loc.oceandrivers_station) {
+    run('oceandrivers', oceanDriversLive(loc.oceandrivers_station));
+    run('oceandrivers-history', oceanDriversHistory(loc.oceandrivers_station));
+  }
 
   if (loc.country === 'ES' && loc.aemet_municipio) {
     run('aemet-hourly', aemetHourly(loc.aemet_municipio, aemetKey));

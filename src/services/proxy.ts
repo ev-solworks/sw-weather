@@ -38,6 +38,21 @@ export interface OceanDriversLive {
   ACTIVE?: string; // 'ON' | 'OFF'
 }
 
+/** One OceanDrivers time-series period: parallel {"0":v,...} objects + length. */
+export interface OceanDriversSeries {
+  TIME?: Record<string, number>;
+  TWS?: Record<string, number>; // knots
+  TWS_GUST?: Record<string, number>; // knots
+  TWD?: Record<string, number>; // degrees
+  length?: number;
+}
+
+/** Wind/gust history: last-hour (1-min) + last-day (hourly) series. */
+export interface OceanDriversHistory {
+  hour?: OceanDriversSeries | null;
+  day?: OceanDriversSeries | null;
+}
+
 /** Raw payloads keyed by provider "kind", as returned by weather-get. */
 export interface ProxyPayloads {
   'aemet-hourly'?: [AemetForecastRoot<AemetHourlyDay>];
@@ -49,6 +64,7 @@ export interface ProxyPayloads {
   'om-marine'?: OpenMeteoMarine;
   'om-aq'?: OpenMeteoAirQuality;
   oceandrivers?: OceanDriversLive;
+  'oceandrivers-history'?: OceanDriversHistory;
 }
 
 export interface ProxyResponse {

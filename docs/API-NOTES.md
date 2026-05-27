@@ -119,11 +119,21 @@ local wind. Use for **current conditions** (wind especially) on Mallorca locatio
 
 ### Live endpoint (verified 2026-05-27)
 ```
-GET /getWeatherDisplay/{stationId}/        ← note: NO ?period param (that 500s)
+GET /getWeatherDisplay/{stationId}/        ← latest reading. NO ?period (bare 500s with period=latest)
 GET /getEasyWind/{stationId}/              ← for "EW"-prefixed EasyWind stations
 ```
 Discovered from the station widget's `weatherStationModel.js` (Backbone model polled
 by `lib/backbone.poller`).
+
+### History / time-series (for graphs)
+```
+GET /getWeatherDisplay/{stationId}/?period=latesthour   ← 60 pts, 1/min (last hour)
+GET /getWeatherDisplay/{stationId}/?period=latestday    ← 24 pts, 1/hour (last 24h)
+```
+Returns PARALLEL objects keyed by index: `TIME`, `TWS`, `TWS_GUST`, `TWD` as
+`{"0":v,"1":v,…}` + a `length`. Zip by index. (`latestweek` 500s — not available.)
+Wired as the `oceandrivers-history` proxy kind → `WeatherConditions.windHistory`
+→ wind/gust sparkline (Today/Visual) + 1h/24h panel (Today/Graph).
 
 ### Station IDs = the subdomain name, LOWERCASE
 | Station | id | coords (from payload) |
