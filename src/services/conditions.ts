@@ -52,17 +52,31 @@ export function wmoToCondition(code: number): ConditionCode {
  * See https://www.aemet.es/ for the full table; we bucket into the union.
  */
 export function aemetSkyToCondition(code: string): ConditionCode {
+  // Official AEMET estadoCielo codes (night 'n' suffix already stripped):
+  //  11 Despejado · 12 Poco nuboso · 13 Intervalos nubosos · 14 Nuboso
+  //  15 Muy nuboso · 16 Cubierto · 17 Nubes altas (high cirrus — reads CLEAR)
+  //  23–26 lluvia · 33–36 nieve · 43–46 lluvia escasa · 51–54/61–64 tormenta
+  //  71–74 nieve escasa · 81 niebla · 82 bruma · 83 calima
   const n = Number(code);
   if (!Number.isFinite(n)) return 'Cloudy';
-  if (n === 11) return 'Clear';
-  if (n === 12 || n === 13) return 'Mostly clear';
-  if (n === 14 || n === 15) return 'Partly cloudy';
-  if (n === 16 || n === 17) return 'Cloudy';
-  if (n >= 81) return 'Fog'; // 81 niebla, 82/83 bruma/calima
-  if (n >= 51 && n <= 64) return 'Thunder'; // tormenta variants
-  if (n >= 33 && n <= 36) return 'Snow';
-  if (n === 24 || n === 25 || n === 26 || n === 64) return 'Heavy rain';
-  if (n === 23 || n === 43 || n === 44 || n === 45 || n === 46) return 'Light rain';
+  switch (n) {
+    case 11:
+      return 'Clear';
+    case 12:
+    case 17: // Nubes altas — thin high cloud; on the ground it's a clear/sunny sky
+      return 'Mostly clear';
+    case 13:
+    case 14:
+      return 'Partly cloudy';
+    case 15:
+    case 16:
+      return 'Cloudy';
+  }
+  if (n === 81 || n === 82 || n === 83) return 'Fog'; // niebla / bruma / calima
+  if ((n >= 51 && n <= 54) || (n >= 61 && n <= 64)) return 'Thunder';
+  if ((n >= 33 && n <= 36) || (n >= 71 && n <= 74)) return 'Snow';
+  if (n === 25 || n === 26) return 'Heavy rain'; // muy nuboso/cubierto + lluvia
+  if (n === 23 || n === 24 || (n >= 43 && n <= 46)) return 'Light rain';
   return 'Cloudy';
 }
 
