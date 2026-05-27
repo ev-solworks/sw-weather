@@ -24,15 +24,18 @@ Atlantic islands), built as a module that can later embed into sw-client-app. Fu
 Get real, normalized `WeatherConditions` for one location before any view work.
 
 - [x] `src/types/weather.ts` — canonical contract
-- [ ] `src/utils/cache.ts` — in-memory Map + localStorage mirror, keyed `{source}:{kind}:{locationId}`, TTL on read. Namespace localStorage under `sw.weather.*` (per INTEGRATION.md §5).
-- [ ] `src/utils/locations.ts` — seed locations (dev data) typed as `Location[]`, with source-routing IDs + TZ.
-- [ ] `src/services/aemet.ts` — two-step `datos` fetch; daily + hourly + station obs; Latin-1 decode guard; cache JSON not URL; municipio IDs as strings.
-- [ ] `src/services/ipma.ts` — daily forecast; cache weather-type / wind-speed / precip lookup tables; oceanography (waves/SST) via `sea-locations.json` globalIdLocal; UV; warnings.
-- [ ] `src/services/openMeteo.ts` — forecast (hourly backfill, wind@altitude), marine (waves/SST for Spain), air-quality (pollen/AQI). Separate hosts per sub-API; pass `timezone`.
-- [ ] `src/services/sun.ts` — suncalc adapter → `SunPhases` + `MoonInfo` (no network).
-- [ ] `src/services/normalize.ts` — merge all sources → `WeatherConditions` per the per-region blend; populate the `sources` provenance map + `confidence`.
-- [ ] `src/hooks/useWeather.ts` — fetch + cache + `{ data, error, loading }` per location.
-- [ ] **Verify:** log a fully-normalized `WeatherConditions` for Palma (ES coastal) and Lisboa (PT) to console; eyeball field-by-field against AEMET/IPMA web. No UI yet.
+- [x] `src/utils/cache.ts` — in-memory Map + localStorage mirror, keyed `{source}:{kind}:{locationId}`, TTL on read. Namespaced `sw.weather.*`; allow-stale read for offline.
+- [x] `src/utils/locations.ts` — seed locations (dev data) typed as `Location[]`, with source-routing IDs + TZ.
+- [x] `src/services/aemet.ts` — two-step `datos` fetch; daily + hourly; Latin-1 decode guard; cache JSON not URL; municipio IDs as strings. (Station obs deferred — hourly covers current via nearest-hour.)
+- [x] `src/services/ipma.ts` — daily forecast; cached weather-type + sea-location lookups; oceanography (waves/SST) via sea globalIdLocal + nearest-sea haversine.
+- [x] `src/services/openMeteo.ts` — forecast (hourly backfill), marine (waves/SST for Spain), air-quality (pollen/AQI), keyless geocoding. Separate hosts; pass `timezone`.
+- [x] `src/services/sun.ts` — suncalc adapter → `SunPhases` + `MoonInfo` (no network).
+- [x] `src/services/conditions.ts` — WMO / AEMET estadoCielo / IPMA weather-type → `ConditionCode`; compass→degrees; day/night variant.
+- [x] `src/services/normalize.ts` — merge all sources → `WeatherConditions` per the per-region blend; provenance map + confidence; TZ-aware day labels.
+- [x] `src/hooks/useWeather.ts` — fetch + cache + `{ data, error, loading, stale }` per location; date revival after cache read.
+- [x] **Verified** against live APIs for Palma (ES) + Lisboa (PT) via `scripts/verify-normalize.ts` (kept as a dev smoke test). Caught + fixed a TZ day-label bug and wired AEMET range-period precip probability.
+
+**Known data-layer limitations (not bugs):** AEMET hourly has no per-hour UV or cloud-cover % (sky-state drives the icon; daily `uvMax` available). AEMET daily gives precip *probability*, not mm. AEMET station observations not yet wired (current = nearest forecast hour). Pollen/AQI fetched but not yet surfaced. These are follow-ups, tracked here.
 
 **Key blend reminders** (from research):
 - ES land/UV/alerts: AEMET primary → OM backfill. ES **waves: Open-Meteo Marine** (AEMET marine is text only).

@@ -80,7 +80,7 @@ export interface AemetHourlyDay {
   vientoAndRachaMax: HourlyWind[];
 }
 
-interface AemetForecastRoot<TDay> {
+export interface AemetForecastRoot<TDay> {
   nombre: string;
   provincia: string;
   elaborado: string;
