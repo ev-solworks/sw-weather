@@ -58,12 +58,14 @@ Get real, normalized `WeatherConditions` for one location before any view work.
 - [ ] Design tokens → `src/styles/tokens.css` (currently Tailwind utilities + inline palette; extract when a 2nd view shares them).
 
 ## Stage 4 — Remaining views
-- [ ] `HomeView` (saved-location cards + motion backdrops)
-- [ ] `WeekView`
+- [x] `HomeView` (saved-location cards + condition backdrops) — done in Stage 3.
+- [x] **`WeekView`** — summary tiles (week hi/lo, peak rain; wave tile only when a day has waves), shared temp scale, per-day gradient range bars + today's current-temp marker, rain/wind/wave chips. Nullable marine handled honestly (no faked zeros). Verified in browser. (Added `stampTodayCurrent` in normalize.)
 - [ ] `TodayWindguru` (dense colored table; memoize cells)
 - [ ] `TodayGraph` (SVG panels; memoize paths)
 - [ ] `TodaySun` (twilight bands, golden hour, moon)
 - [ ] Details view incl. **marine/watersports block** (waves/period/dir/SST, confidence badge)
+
+**Resilience follow-up (noted 2026-05-27):** hit a transient AEMET `ConnectTimeoutError` in testing → a cold load with nothing cached dead-ends at "Couldn't load." Stale-cache fallback only helps after a first success. Consider retry-on-mount with backoff and/or partial render (show IPMA/OM even if AEMET times out). AEMET OpenData is intermittently slow.
 
 ## Stage 5 — Locations UX
 - [ ] Geolocation acquisition

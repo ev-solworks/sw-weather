@@ -113,6 +113,12 @@ function currentFromHour(hour: HourForecast): CurrentConditions {
   };
 }
 
+/** Stamp the current temperature onto today's day row (drives the Week marker). */
+function stampTodayCurrent(days: DayForecast[], currentTemp: number): void {
+  const today = days.find((d) => d.dayName === 'Today');
+  if (today) today.tempCurrent = currentTemp;
+}
+
 /** Pick the forecast hour nearest to `now` as a stand-in current conditions. */
 function nearestHour(hours: HourForecast[], now = Date.now()): HourForecast {
   let best = hours[0];
@@ -143,6 +149,7 @@ async function normalizeSpain(loc: Location): Promise<WeatherConditions> {
   const hours = aemetHourlyToHours(hourly, marine, loc.timezone);
   const days = aemetDailyToDays(daily, loc.timezone);
   const current = currentFromHour(nearestHour(hours));
+  stampTodayCurrent(days, current.temperature);
   const sun = computeSunPhases(new Date(), loc.lat, loc.lon);
   const moon = computeMoonInfo(new Date(), loc.lat, loc.lon);
 
@@ -181,6 +188,7 @@ async function normalizePortugal(loc: Location): Promise<WeatherConditions> {
   // Days: IPMA land (HIGH) + IPMA sea waves where available.
   const days = ipmaDailyToDays(ipmaDaily, sea, loc.timezone);
   const current = currentFromHour(nearestHour(hours));
+  stampTodayCurrent(days, current.temperature);
   const sun = computeSunPhases(new Date(), loc.lat, loc.lon);
   const moon = computeMoonInfo(new Date(), loc.lat, loc.lon);
 

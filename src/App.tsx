@@ -8,6 +8,7 @@ import { NavProvider, useNav } from '@/app/navigation';
 import { TabBar } from '@/components/TabBar';
 import { HomeView } from '@/views/HomeView';
 import { TodayView } from '@/views/TodayView';
+import { WeekView } from '@/views/WeekView';
 import { ComingSoon } from '@/views/ComingSoon';
 
 function CurrentView() {
@@ -18,7 +19,7 @@ function CurrentView() {
     case 'today':
       return <TodayView />;
     case 'week':
-      return <ComingSoon title="Week" />;
+      return <WeekView />;
     case 'map':
       return <ComingSoon title="Map" />;
     case 'more':
