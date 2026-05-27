@@ -23,7 +23,7 @@ function nearestHourIndex(hours: { time: Date }[], now: number): number {
   return idx;
 }
 
-export function TodayVisual({ weather }: { weather: WeatherConditions }) {
+export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherConditions; onOpenSwitcher?: () => void }) {
   const { hours, days, location, current, sun } = weather;
   const tz = location.timezone;
   const nowMs = Date.now();
@@ -38,7 +38,7 @@ export function TodayVisual({ weather }: { weather: WeatherConditions }) {
   const uv = current.uvIndex ?? days[0]?.uvMax ?? 0;
 
   return (
-    <div className="flex h-full min-h-svh w-full flex-col overflow-hidden bg-[#0a0f1c] text-neutral-200">
+    <div className="flex w-full flex-col bg-[#0a0f1c] text-neutral-200">
       {/* ── Hero ─────────────────────────────────────────────── */}
       <div className="relative h-[360px] shrink-0 overflow-hidden">
         <WeatherBackdrop desc={current.description} hour={heroHour} />
@@ -46,7 +46,10 @@ export function TodayVisual({ weather }: { weather: WeatherConditions }) {
         <div className="relative z-10 flex h-full flex-col px-4 pb-3 pt-2 text-neutral-50">
           {/* Top bar */}
           <div className="flex items-center justify-between">
-            <button className="flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[13px] font-medium backdrop-blur">
+            <button
+              onClick={onOpenSwitcher}
+              className="flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[13px] font-medium backdrop-blur"
+            >
               <span className="h-1.5 w-1.5 rounded-full bg-neutral-50 shadow-[0_0_6px_rgba(255,255,255,.6)]" />
               {location.name}
               <svg width="10" height="6" viewBox="0 0 10 6" className="opacity-60">

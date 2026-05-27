@@ -51,10 +51,11 @@ Get real, normalized `WeatherConditions` for one location before any view work.
 - [x] `src/components/WeatherBackdrop.tsx` — static condition+time-of-day gradient (CSS-keyframe motion layers deferred to Stage 4).
 - [x] `src/utils/format.ts` — TZ-aware time/hour, compass, UV label, duration.
 - [x] **`TodayVisual`** wired to real `useWeather` for Palma — hero stack, next-12h strip, wind/humidity/UV metrics, daylight sun arc. UV falls back to daily uvMax.
-- [x] `src/App.tsx` — loads Palma, loading/error/stale states, mobile max-width shell.
 - [x] **Verified in real browser** (CDP screenshot at 390px): live AEMET data renders correctly, TZ-correct times (NOW·10:00, sunset 21:07 Europe/Madrid). The full chain works end-to-end on a screen.
-- [ ] Router + tab bar (Home · Today · Week · Map · More) — next, with the location switcher.
-- [ ] Design tokens → `src/styles/tokens.css` (currently using Tailwind utilities + inline palette; extract when a 2nd view needs to share them).
+- [x] **Navigation (context-based, no router)** — `app/navigation.tsx` (active tab + Today sub-view + saved locations, persisted to `sw.weather.locations`); `TabBar` (Home·Today·Week·Map·More; Map/More disabled); `LocationSwitcher` bottom-sheet. App shell renders the active tab. Routerless → embeddable per INTEGRATION.md.
+- [x] **Home dashboard** — `HomeView` with per-location cards (featured taller + 6h strip), each via `useWeather` (cached); condition backdrops; tap → Today/Visual.
+- [x] **Fixed AEMET rate-limit burst** — Home firing 4 ES locations at once tripped 429s (Madrid failed). Added a concurrency gate (max 3 in flight, ~350ms spacing) + single 429 retry in `aemet.ts`. All 5 locations now load.
+- [ ] Design tokens → `src/styles/tokens.css` (currently Tailwind utilities + inline palette; extract when a 2nd view shares them).
 
 ## Stage 4 — Remaining views
 - [ ] `HomeView` (saved-location cards + motion backdrops)

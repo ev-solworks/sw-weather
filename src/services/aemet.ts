@@ -107,14 +107,74 @@ async function decodeBody(res: Response): Promise<string> {
 }
 
 /**
- * Run the AEMET two-step and return the parsed `datos` payload. This is the single
+ * Throttle gate. The 50 req/min limit is the system's tightest constraint, and
+ * Home fires several locations at once (each = 2 endpoints × 2-step). We cap
+ * concurrency and space requests so a burst can't trip a 429. ~600ms spacing →
+ * ≤~100 calls/min ceiling, but concurrency=3 keeps the real rate well under 50.
+ */
+const MAX_CONCURRENT = 3;
+const MIN_SPACING_MS = 350;
+let active = 0;
+let lastStart = 0;
+const queue: Array<() => void> = [];
+
+function acquire(): Promise<void> {
+  return new Promise((resolve) => {
+    const tryRun = () => {
+      const now = Date.now();
+      const sinceLast = now - lastStart;
+      if (active < MAX_CONCURRENT && sinceLast >= MIN_SPACING_MS) {
+        active++;
+        lastStart = Date.now();
+        resolve();
+      } else {
+        const wait = active >= MAX_CONCURRENT ? 50 : MIN_SPACING_MS - sinceLast;
+        setTimeout(() => {
+          queue.push(tryRun);
+          drain();
+        }, wait);
+      }
+    };
+    queue.push(tryRun);
+    drain();
+  });
+}
+
+function drain(): void {
+  const next = queue.shift();
+  if (next) next();
+}
+
+function release(): void {
+  active = Math.max(0, active - 1);
+  drain();
+}
+
+async function throttledFetch(url: string): Promise<Response> {
+  await acquire();
+  try {
+    return await fetch(url);
+  } finally {
+    release();
+  }
+}
+
+/**
+ * Run the AEMET two-step and return the parsed `datos` payload. Throttled to stay
+ * under the 50/min limit; retries once on 429 after a backoff. This is the single
  * seam to reroute through the Supabase edge function in Stage 2.
  */
-async function aemetFetch<T>(path: string): Promise<T> {
+async function aemetFetch<T>(path: string, retryOn429 = true): Promise<T> {
   const url = `${BASE}${path}${path.includes('?') ? '&' : '?'}api_key=${encodeURIComponent(getApiKey())}`;
 
-  const step1 = await fetch(url);
-  if (step1.status === 429) throw new AemetError('AEMET rate limit (50/min) exceeded', 429);
+  const step1 = await throttledFetch(url);
+  if (step1.status === 429) {
+    if (retryOn429) {
+      await new Promise((r) => setTimeout(r, 2000));
+      return aemetFetch<T>(path, false);
+    }
+    throw new AemetError('AEMET rate limit (50/min) exceeded', 429);
+  }
   if (!step1.ok) throw new AemetError(`AEMET endpoint ${path} failed`, step1.status);
 
   const envelope = JSON.parse(await decodeBody(step1)) as AemetEnvelope;
@@ -122,7 +182,8 @@ async function aemetFetch<T>(path: string): Promise<T> {
     throw new AemetError(`AEMET ${path}: ${envelope.descripcion} (estado ${envelope.estado})`, envelope.estado);
   }
 
-  const step2 = await fetch(envelope.datos);
+  // The datos URL is a separate (unmetered) host but throttle anyway to be safe.
+  const step2 = await throttledFetch(envelope.datos);
   if (!step2.ok) throw new AemetError(`AEMET datos URL failed (expired?)`, step2.status);
 
   return JSON.parse(await decodeBody(step2)) as T;

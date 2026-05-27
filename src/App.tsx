@@ -1,46 +1,47 @@
 /**
- * App shell — Stage 3 vertical slice. Loads Palma de Mallorca via useWeather and
- * renders Today · Visual. Router + tab bar + location switcher come next; for now
- * this proves the data layer → view contract against a real screen.
+ * App shell — standalone surface. Provides nav context, renders the active tab's
+ * view inside a mobile max-width frame, with the bottom tab bar. The embedded
+ * module (future src/module.tsx) will reuse NavProvider + the same view switch.
  */
 
-import { useWeather } from '@/hooks/useWeather';
-import { getSeedLocation } from '@/utils/locations';
-import { TodayVisual } from '@/views/TodayVisual';
+import { NavProvider, useNav } from '@/app/navigation';
+import { TabBar } from '@/components/TabBar';
+import { HomeView } from '@/views/HomeView';
+import { TodayView } from '@/views/TodayView';
+import { ComingSoon } from '@/views/ComingSoon';
 
-const PALMA = getSeedLocation('palma')!;
+function CurrentView() {
+  const { tab } = useNav();
+  switch (tab) {
+    case 'home':
+      return <HomeView />;
+    case 'today':
+      return <TodayView />;
+    case 'week':
+      return <ComingSoon title="Week" />;
+    case 'map':
+      return <ComingSoon title="Map" />;
+    case 'more':
+      return <ComingSoon title="More" />;
+  }
+}
+
+function Shell() {
+  return (
+    <div className="mx-auto flex h-svh w-full max-w-[430px] flex-col overflow-hidden bg-[#0a0f1c] shadow-2xl">
+      <div className="min-h-0 flex-1">
+        <CurrentView />
+      </div>
+      <TabBar />
+    </div>
+  );
+}
 
 function App() {
-  const { data, loading, error, stale } = useWeather(PALMA);
-
-  if (loading && !data) {
-    return (
-      <main className="flex min-h-svh items-center justify-center bg-[#0a0f1c]">
-        <div className="animate-pulse text-sm text-neutral-500">Loading {PALMA.name}…</div>
-      </main>
-    );
-  }
-
-  if (error && !data) {
-    return (
-      <main className="flex min-h-svh flex-col items-center justify-center gap-2 bg-[#0a0f1c] px-6 text-center">
-        <div className="text-sm font-medium text-neutral-200">Couldn’t load weather</div>
-        <div className="text-xs text-neutral-500">{error}</div>
-      </main>
-    );
-  }
-
-  if (!data) return null;
-
   return (
-    <div className="mx-auto flex min-h-svh w-full max-w-[430px] flex-col overflow-hidden bg-[#0a0f1c] shadow-2xl">
-      {stale && (
-        <div className="bg-amber-900/40 px-4 py-1 text-center text-[11px] text-amber-200">
-          Showing last known forecast (offline)
-        </div>
-      )}
-      <TodayVisual weather={data} />
-    </div>
+    <NavProvider>
+      <Shell />
+    </NavProvider>
   );
 }
 
