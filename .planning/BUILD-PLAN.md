@@ -60,9 +60,9 @@ Get real, normalized `WeatherConditions` for one location before any view work.
 ## Stage 4 — Remaining views
 - [x] `HomeView` (saved-location cards + condition backdrops) — done in Stage 3.
 - [x] **`WeekView`** — summary tiles (week hi/lo, peak rain; wave tile only when a day has waves), shared temp scale, per-day gradient range bars + today's current-temp marker, rain/wind/wave chips. Nullable marine handled honestly (no faked zeros). Verified in browser. (Added `stampTodayCurrent` in normalize.)
-- [ ] `TodayWindguru` (dense colored table; memoize cells)
+- [x] **`TodaySun`** (twilight bands, golden hour arc, phase list, moon disc) — see Stage-4 entry above.
+- [x] **`TodayWindguru`** — dense color-coded hourly table; sticky label column + sync-scrolling rows; memoized cells; auto-scroll to now; per-metric ramps in `scales/wgScales.ts`. Marine rows show honest dots when no wave data. Legend strip. Verified for Palma. **Surfaced:** AEMET hourly has no per-hour cloud%/UV → those rows are dots for ES locations (PT/Open-Meteo populates them). Possible follow-up: backfill ES hourly cloud/UV from Open-Meteo.
 - [ ] `TodayGraph` (SVG panels; memoize paths)
-- [ ] `TodaySun` (twilight bands, golden hour, moon)
 - [ ] Details view incl. **marine/watersports block** (waves/period/dir/SST, confidence badge)
 
 **Resilience follow-up (noted 2026-05-27):** hit a transient AEMET `ConnectTimeoutError` in testing → a cold load with nothing cached dead-ends at "Couldn't load." Stale-cache fallback only helps after a first success. Consider retry-on-mount with backoff and/or partial render (show IPMA/OM even if AEMET times out). AEMET OpenData is intermittently slow.
