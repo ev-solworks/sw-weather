@@ -114,6 +114,35 @@ function currentFromHour(hour: HourForecast): CurrentConditions {
   };
 }
 
+/** AEMET conventional station observation reading (subset we use). */
+interface AemetObsReading {
+  fint?: string; // ISO observation time
+  ta?: number; // air temperature °C
+  hr?: number; // relative humidity %
+  pres?: number; // pressure hPa
+}
+
+/**
+ * Pick the latest usable reading from an AEMET station obs payload (array of
+ * hourly readings). Returns measured temp/humidity/pressure + obs time, or null.
+ */
+function parseAemetObs(payload: unknown): { ta: number | null; hr: number | null; pres: number | null; fint: Date | null } | null {
+  if (!Array.isArray(payload) || payload.length === 0) return null;
+  // Last reading with a numeric air temperature.
+  for (let i = payload.length - 1; i >= 0; i--) {
+    const r = payload[i] as AemetObsReading;
+    if (typeof r?.ta === 'number') {
+      return {
+        ta: Math.round(r.ta),
+        hr: typeof r.hr === 'number' ? Math.round(r.hr) : null,
+        pres: typeof r.pres === 'number' ? Math.round(r.pres) : null,
+        fint: r.fint ? new Date(r.fint) : null,
+      };
+    }
+  }
+  return null;
+}
+
 /** Stamp the current temperature onto today's day row (drives the Week marker). */
 function stampTodayCurrent(days: DayForecast[], currentTemp: number): void {
   const today = days.find((d) => d.dayName === 'Today');
@@ -144,7 +173,24 @@ async function normalizeSpain(loc: Location, p: ProxyPayloads): Promise<WeatherC
 
   const hours = aemetHourlyToHours(hourly, marine, loc.timezone);
   const days = aemetDailyToDays(daily, loc.timezone);
-  const current = currentFromHour(nearestHour(hours));
+  let current = currentFromHour(nearestHour(hours));
+
+  // Overlay measured station observation onto current where available (temp/
+  // humidity/pressure). Sky + wind stay from the forecast hour (the conventional
+  // station feed has no sky code and often no wind). Provenance reflects which.
+  const obs = parseAemetObs(p['aemet-obs']);
+  let tempIsObserved = false;
+  if (obs) {
+    current = {
+      ...current,
+      temperature: obs.ta ?? current.temperature,
+      feelsLike: obs.ta ?? current.feelsLike, // station has no apparent temp; use measured air temp
+      humidity: obs.hr ?? current.humidity,
+      pressure: obs.pres ?? current.pressure,
+      observedAt: obs.fint ?? current.observedAt,
+    };
+    tempIsObserved = obs.ta != null;
+  }
   stampTodayCurrent(days, current.temperature);
   const sun = computeSunPhases(new Date(), loc.lat, loc.lon);
   const moon = computeMoonInfo(new Date(), loc.lat, loc.lon);
@@ -156,6 +202,7 @@ async function normalizeSpain(loc: Location, p: ProxyPayloads): Promise<WeatherC
     uv: prov('aemet', 'high'),
     sky: prov('aemet', 'high'),
     sun: prov('suncalc', 'high'),
+    current: prov('aemet', 'high', tempIsObserved ? 'station-obs' : 'forecast'),
   };
   if (marine) {
     const marineConf: Confidence = loc.timezone === 'Atlantic/Canary' ? 'low' : 'medium';
