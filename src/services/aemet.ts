@@ -107,15 +107,19 @@ async function decodeBody(res: Response): Promise<string> {
 }
 
 /**
- * Rate limiter. ONLY the AEMET API endpoint (step 1) counts toward the 50 req/min
- * limit — the `datos` URL (step 2) is a separate, unmetered host, so we don't
- * throttle it. We use a 60s sliding window capped at 45 (safe margin under 50)
- * plus a concurrency cap. This lets a cold burst (e.g. Home loading several
- * locations) fire in parallel instead of being serialized by a fixed delay.
+ * Rate limiter + timeout. AEMET doesn't return 429 under concurrent load — it
+ * silently HANGS the connection (observed: parallel requests stall ~30s with no
+ * response). So we must BOTH cap concurrency low AND bound each request with a
+ * timeout so a hung socket fails fast and retries instead of blocking the UI.
+ *
+ * 50 req/min is the documented cap; we stay well under it. Low concurrency (2)
+ * is what actually keeps AEMET responsive — it's the concurrency, not the rate,
+ * that triggers the hangs. The 60s window is a secondary safety net.
  */
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 45;
-const MAX_CONCURRENT = 6;
+const MAX_CONCURRENT = 2;
+const REQUEST_TIMEOUT_MS = 8_000;
 
 let active = 0;
 const recent: number[] = []; // timestamps of recent metered calls
@@ -162,11 +166,22 @@ function releaseMetered(): void {
   while (waiters.length && tryAdmit()) waiters.shift()!();
 }
 
-/** Throttled fetch for the metered API endpoint (step 1). */
+/** fetch with an abort-based timeout — AEMET hangs sockets under load. */
+async function fetchWithTimeout(url: string, ms = REQUEST_TIMEOUT_MS): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Throttled, timed fetch for the metered API endpoint (step 1). */
 async function meteredFetch(url: string): Promise<Response> {
   await acquireMetered();
   try {
-    return await fetch(url);
+    return await fetchWithTimeout(url);
   } finally {
     releaseMetered();
   }
@@ -195,8 +210,9 @@ async function aemetFetch<T>(path: string, retryOn429 = true): Promise<T> {
     throw new AemetError(`AEMET ${path}: ${envelope.descripcion} (estado ${envelope.estado})`, envelope.estado);
   }
 
-  // The datos URL is a separate, UNMETERED host — fetch directly (no rate limit).
-  const step2 = await fetch(envelope.datos);
+  // The datos URL is the SAME host (opendata.aemet.es) → also subject to the
+  // concurrency hang. Route it through the limiter + timeout too.
+  const step2 = await meteredFetch(envelope.datos);
   if (!step2.ok) throw new AemetError(`AEMET datos URL failed (expired?)`, step2.status);
 
   return JSON.parse(await decodeBody(step2)) as T;
