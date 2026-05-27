@@ -47,11 +47,14 @@ Get real, normalized `WeatherConditions` for one location before any view work.
 - [ ] `.env` / `.env.example`: document the Supabase URL + anon key; remove `VITE_AEMET_API_KEY` from the client once proxied.
 
 ## Stage 3 — App shell + first view (vertical slice)
-- [ ] `src/main.tsx` + `src/App.tsx` — router + tab bar (Home · Today · Week · Map · More).
-- [ ] Design tokens → `src/styles/tokens.css`; motion keyframes → `motion.css`.
-- [ ] `src/components/WxIcon.tsx`, `WeatherBackdrop/`, color scales (`scales/wgScales.ts`).
-- [ ] **`TodayVisual`** wired to real `useWeather` for one location — the vertical slice that validates the contract against reality.
-- [ ] **Verify in preview.**
+- [x] `src/components/WxIcon.tsx` — line glyphs per ConditionCode, day/night variants.
+- [x] `src/components/WeatherBackdrop.tsx` — static condition+time-of-day gradient (CSS-keyframe motion layers deferred to Stage 4).
+- [x] `src/utils/format.ts` — TZ-aware time/hour, compass, UV label, duration.
+- [x] **`TodayVisual`** wired to real `useWeather` for Palma — hero stack, next-12h strip, wind/humidity/UV metrics, daylight sun arc. UV falls back to daily uvMax.
+- [x] `src/App.tsx` — loads Palma, loading/error/stale states, mobile max-width shell.
+- [x] **Verified in real browser** (CDP screenshot at 390px): live AEMET data renders correctly, TZ-correct times (NOW·10:00, sunset 21:07 Europe/Madrid). The full chain works end-to-end on a screen.
+- [ ] Router + tab bar (Home · Today · Week · Map · More) — next, with the location switcher.
+- [ ] Design tokens → `src/styles/tokens.css` (currently using Tailwind utilities + inline palette; extract when a 2nd view needs to share them).
 
 ## Stage 4 — Remaining views
 - [ ] `HomeView` (saved-location cards + motion backdrops)
