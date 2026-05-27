@@ -46,17 +46,26 @@ Solo developer, preview server one tab away, user is the verifier. Work in a sle
 
 ## API keys
 
-- `VITE_AEMET_API_KEY` — required for Spain forecasts. Already provisioned, lives in `.env` (gitignored). Template at [.env.example](.env.example). To be moved behind the Supabase edge-function proxy.
-- IPMA: no key needed.
-- Open-Meteo (forecast / marine / air-quality / geocoding): no key needed.
+**The client uses NO upstream keys.** All weather goes through the Supabase edge proxy (see [edge/README.md](edge/README.md) + [.planning/EDGE-PROXY.md](.planning/EDGE-PROXY.md)).
+
+- Client `.env`: `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` (both public). `VITE_AEMET_API_KEY` is **no longer used client-side** — remove it.
+- `AEMET_API_KEY` lives as a **Supabase edge-function secret** on the `sw_client_app` project. IPMA / Open-Meteo need no key.
 
 ## Architecture in one paragraph
 
 ```
-API client (services/) → normalize.ts → cache (utils/cache.ts) → React hook (hooks/) → view (views/)
+cron → weather-refresh ─┐
+                        ▼
+   AEMET/IPMA/Open-Meteo → weather_cache (Supabase, raw payloads)
+                        ▼
+client: proxy.ts (weather-get) → normalize.ts → cache (utils/cache.ts) → useWeather → view
 ```
 
-Every view consumes the unified `WeatherConditions` type from [src/types/weather.ts](src/types/weather.ts). Views never touch raw AEMET or IPMA payloads. The normalize layer is the single source of truth for "what does our app think weather data looks like."
+The edge proxy fetches upstream server-side and caches RAW payloads; the client
+normalizes them. One server hits AEMET (low concurrency, immune to the per-device
+IP block); all devices read the warm cache. Every view consumes the unified
+`WeatherConditions` from [src/types/weather.ts](src/types/weather.ts) — views never touch raw payloads.
+`current` for ES uses the **measured AEMET station observation** when available, else the forecast hour.
 
 ## AEMET — the two-step fetch (read this before touching aemet.ts)
 

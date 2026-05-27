@@ -1,6 +1,13 @@
 /**
- * AEMET OpenData client (Spain). Returns lightly-typed, source-shaped data; the
- * mapping into the canonical `WeatherConditions` happens in normalize.ts.
+ * AEMET OpenData types + parse helpers (Spain).
+ *
+ * NOTE (Stage 2 done): the CLIENT no longer fetches AEMET directly — the Supabase
+ * edge proxy does (edge/functions/_shared/weather-fetch.ts), and normalize.ts reads
+ * cached raw payloads via services/proxy.ts. This module is kept as the TYPE source
+ * (AemetForecastRoot, AemetHourlyDay, …) and the parse helpers normalize.ts uses
+ * (parseSkyCode, pairWind, aemetNum). The fetch functions below are retained as a
+ * direct-fallback / reference and are NOT called in the normal client path, so
+ * VITE_AEMET_API_KEY is no longer required client-side.
  *
  * THE TWO-STEP FETCH (read docs/API-NOTES.md before touching this):
  *   1. GET an endpoint with `?api_key=KEY` → `{ datos, metadatos, estado }`.
