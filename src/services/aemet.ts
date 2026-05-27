@@ -107,55 +107,68 @@ async function decodeBody(res: Response): Promise<string> {
 }
 
 /**
- * Throttle gate. The 50 req/min limit is the system's tightest constraint, and
- * Home fires several locations at once (each = 2 endpoints × 2-step). We cap
- * concurrency and space requests so a burst can't trip a 429. ~600ms spacing →
- * ≤~100 calls/min ceiling, but concurrency=3 keeps the real rate well under 50.
+ * Rate limiter. ONLY the AEMET API endpoint (step 1) counts toward the 50 req/min
+ * limit — the `datos` URL (step 2) is a separate, unmetered host, so we don't
+ * throttle it. We use a 60s sliding window capped at 45 (safe margin under 50)
+ * plus a concurrency cap. This lets a cold burst (e.g. Home loading several
+ * locations) fire in parallel instead of being serialized by a fixed delay.
  */
-const MAX_CONCURRENT = 3;
-const MIN_SPACING_MS = 350;
-let active = 0;
-let lastStart = 0;
-const queue: Array<() => void> = [];
+const WINDOW_MS = 60_000;
+const MAX_PER_WINDOW = 45;
+const MAX_CONCURRENT = 6;
 
-function acquire(): Promise<void> {
+let active = 0;
+const recent: number[] = []; // timestamps of recent metered calls
+const waiters: Array<() => void> = [];
+
+function pruneWindow(now: number): void {
+  while (recent.length && now - recent[0] >= WINDOW_MS) recent.shift();
+}
+
+function tryAdmit(): boolean {
+  const now = Date.now();
+  pruneWindow(now);
+  if (active < MAX_CONCURRENT && recent.length < MAX_PER_WINDOW) {
+    active++;
+    recent.push(now);
+    return true;
+  }
+  return false;
+}
+
+function acquireMetered(): Promise<void> {
   return new Promise((resolve) => {
-    const tryRun = () => {
-      const now = Date.now();
-      const sinceLast = now - lastStart;
-      if (active < MAX_CONCURRENT && sinceLast >= MIN_SPACING_MS) {
-        active++;
-        lastStart = Date.now();
-        resolve();
-      } else {
-        const wait = active >= MAX_CONCURRENT ? 50 : MIN_SPACING_MS - sinceLast;
-        setTimeout(() => {
-          queue.push(tryRun);
-          drain();
-        }, wait);
-      }
-    };
-    queue.push(tryRun);
-    drain();
+    if (tryAdmit()) return resolve();
+    waiters.push(resolve);
+    scheduleDrain();
   });
 }
 
-function drain(): void {
-  const next = queue.shift();
-  if (next) next();
+let drainTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleDrain(): void {
+  if (drainTimer) return;
+  // Wake when either a slot frees (polled) or the oldest window entry expires.
+  const now = Date.now();
+  const untilWindow = recent.length >= MAX_PER_WINDOW ? Math.max(50, WINDOW_MS - (now - recent[0])) : 80;
+  drainTimer = setTimeout(() => {
+    drainTimer = null;
+    while (waiters.length && tryAdmit()) waiters.shift()!();
+    if (waiters.length) scheduleDrain();
+  }, untilWindow);
 }
 
-function release(): void {
+function releaseMetered(): void {
   active = Math.max(0, active - 1);
-  drain();
+  while (waiters.length && tryAdmit()) waiters.shift()!();
 }
 
-async function throttledFetch(url: string): Promise<Response> {
-  await acquire();
+/** Throttled fetch for the metered API endpoint (step 1). */
+async function meteredFetch(url: string): Promise<Response> {
+  await acquireMetered();
   try {
     return await fetch(url);
   } finally {
-    release();
+    releaseMetered();
   }
 }
 
@@ -167,7 +180,7 @@ async function throttledFetch(url: string): Promise<Response> {
 async function aemetFetch<T>(path: string, retryOn429 = true): Promise<T> {
   const url = `${BASE}${path}${path.includes('?') ? '&' : '?'}api_key=${encodeURIComponent(getApiKey())}`;
 
-  const step1 = await throttledFetch(url);
+  const step1 = await meteredFetch(url);
   if (step1.status === 429) {
     if (retryOn429) {
       await new Promise((r) => setTimeout(r, 2000));
@@ -182,8 +195,8 @@ async function aemetFetch<T>(path: string, retryOn429 = true): Promise<T> {
     throw new AemetError(`AEMET ${path}: ${envelope.descripcion} (estado ${envelope.estado})`, envelope.estado);
   }
 
-  // The datos URL is a separate (unmetered) host but throttle anyway to be safe.
-  const step2 = await throttledFetch(envelope.datos);
+  // The datos URL is a separate, UNMETERED host — fetch directly (no rate limit).
+  const step2 = await fetch(envelope.datos);
   if (!step2.ok) throw new AemetError(`AEMET datos URL failed (expired?)`, step2.status);
 
   return JSON.parse(await decodeBody(step2)) as T;

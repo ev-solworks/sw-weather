@@ -10,10 +10,12 @@
  * No timer polling (AEMET 50/min budget) — refresh is user-triggered via refetch.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Location, WeatherConditions } from '@/types/weather';
 import { cacheGet, cacheGetAllowStale, cacheKey, cacheSet } from '@/utils/cache';
 import { getWeather } from '@/services/normalize';
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const BUNDLE_TTL = 10 * 60 * 1000; // 10 min — matches INTEGRATION.md hourly cache hint
 
@@ -25,15 +27,19 @@ export interface UseWeatherResult {
   refetch: () => void;
 }
 
-export function useWeather(location: Location | null): UseWeatherResult {
+export function useWeather(location: Location | null, enabled = true): UseWeatherResult {
   const [data, setData] = useState<WeatherConditions | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [stale, setStale] = useState(false);
 
+  // Guards against a stale retry clobbering state after the location changed.
+  const reqId = useRef(0);
+
   const load = useCallback(
     async (loc: Location, force = false) => {
       const key = cacheKey('bundle', 'weather', loc.id);
+      const myReq = ++reqId.current;
 
       if (!force) {
         const cached = cacheGet<WeatherConditions>(key);
@@ -47,28 +53,42 @@ export function useWeather(location: Location | null): UseWeatherResult {
 
       setLoading(true);
       setError(null);
-      try {
-        const bundle = await getWeather(loc);
-        cacheSet(key, bundle, BUNDLE_TTL);
-        setData(bundle);
-        setStale(false);
-      } catch (e) {
-        const stalest = cacheGetAllowStale<WeatherConditions>(key);
-        if (stalest) {
-          setData(reviveDates(stalest.value));
-          setStale(true);
+
+      // Bounded retry with backoff — transient AEMET blips shouldn't leave a dead card.
+      const backoffs = [0, 1500, 4000];
+      for (let attempt = 0; attempt < backoffs.length; attempt++) {
+        if (backoffs[attempt]) await sleep(backoffs[attempt]);
+        if (reqId.current !== myReq) return; // superseded
+        try {
+          const bundle = await getWeather(loc);
+          if (reqId.current !== myReq) return;
+          cacheSet(key, bundle, BUNDLE_TTL);
+          setData(bundle);
+          setStale(false);
+          setError(null);
+          setLoading(false);
+          return;
+        } catch (e) {
+          if (reqId.current !== myReq) return;
+          const last = attempt === backoffs.length - 1;
+          if (last) {
+            const stalest = cacheGetAllowStale<WeatherConditions>(key);
+            if (stalest) {
+              setData(reviveDates(stalest.value));
+              setStale(true);
+            }
+            setError(e instanceof Error ? e.message : 'Failed to load weather');
+            setLoading(false);
+          }
         }
-        setError(e instanceof Error ? e.message : 'Failed to load weather');
-      } finally {
-        setLoading(false);
       }
     },
     [],
   );
 
   useEffect(() => {
-    if (location) void load(location);
-  }, [location, load]);
+    if (location && enabled) void load(location);
+  }, [location, enabled, load]);
 
   const refetch = useCallback(() => {
     if (location) void load(location, true);

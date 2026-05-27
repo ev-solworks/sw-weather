@@ -361,7 +361,22 @@ function indexSky(
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
-/** Fetch + normalize a full WeatherConditions bundle for a location. */
-export async function getWeather(loc: Location): Promise<WeatherConditions> {
+async function assemble(loc: Location): Promise<WeatherConditions> {
   return loc.country === 'ES' ? normalizeSpain(loc) : normalizePortugal(loc);
+}
+
+/**
+ * In-flight de-duplication: if a bundle for this location is already being
+ * fetched (e.g. a Home card and the Today view mounting at once), share the same
+ * promise instead of firing a duplicate set of upstream calls.
+ */
+const inFlight = new Map<string, Promise<WeatherConditions>>();
+
+/** Fetch + normalize a full WeatherConditions bundle for a location (deduped). */
+export function getWeather(loc: Location): Promise<WeatherConditions> {
+  const existing = inFlight.get(loc.id);
+  if (existing) return existing;
+  const p = assemble(loc).finally(() => inFlight.delete(loc.id));
+  inFlight.set(loc.id, p);
+  return p;
 }

@@ -10,6 +10,7 @@
 import type { Location, WeatherConditions } from '@/types/weather';
 import { useNav } from '@/app/navigation';
 import { useWeather } from '@/hooks/useWeather';
+import { useInView } from '@/hooks/useInView';
 import { WeatherBackdrop } from '@/components/WeatherBackdrop';
 import { WxIcon } from '@/components/WxIcon';
 import { fmtTime, localHour } from '@/utils/format';
@@ -75,10 +76,13 @@ function IconButton({ label, children }: { label: string; children: React.ReactN
 }
 
 function LocationCard({ location, featured, onOpen }: { location: Location; featured: boolean; onOpen: () => void }) {
-  const { data, loading, error } = useWeather(location);
+  const [ref, inView] = useInView<HTMLButtonElement>('300px');
+  // Featured card is always on screen → fetch immediately; others wait until near.
+  const { data, loading, error } = useWeather(location, featured || inView);
 
   return (
     <button
+      ref={ref}
       onClick={onOpen}
       className={`relative w-full overflow-hidden rounded-2xl border border-white/5 text-left shadow-[0_8px_24px_rgba(0,0,0,.35)] ${
         featured ? 'h-[196px]' : 'h-[108px]'
