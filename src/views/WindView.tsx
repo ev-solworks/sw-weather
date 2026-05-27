@@ -1,20 +1,24 @@
 /**
- * Wind — live measured wind stations (Map tab). 2×3 grid of station cards, each a
- * Sweep rosette around a centered speed readout (knots default, km/h toggle).
- * Tap a card → bottom-sheet detail with the current reading + a wind/gust graph
- * over 1h / 6h / 12h / 24h. Data from the OceanDrivers network via the proxy.
+ * Wind — live measured wind stations (Wind tab). 2-col grid of Sweep-rosette
+ * cards. Registry comes from the proxy; live readings are polled DIRECTLY from
+ * OceanDrivers every ~4s for genuine real-time. Tap a card → detail sheet with a
+ * wind/gust graph over 1h/6h/12h/24h. knots default + km/h toggle (persisted).
+ *
+ * Card layout: wind speed big & centered; gust as a smaller number just below it
+ * (inside the rosette); direction (degrees + compass letter) outside, below the ring.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { WindHistoryPoint } from '@/types/weather';
 import {
-  fetchStationDetail,
-  fetchStations,
+  fetchLiveAll,
+  fetchStationHistory,
+  fetchStationRegistry,
+  fmtSpeed,
   loadWindUnit,
   saveWindUnit,
   toUnit,
   unitLabel,
-  type Station,
   type StationMeta,
   type StationReading,
   type WindUnit,
@@ -24,22 +28,47 @@ import { WindHistoryChart } from '@/components/WindHistoryChart';
 
 const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 const compass = (d: number) => COMPASS[Math.round((d % 360) / 22.5) % 16];
+const LIVE_POLL_MS = 4000;
 
 export function WindView() {
-  const [stations, setStations] = useState<Station[] | null>(null);
+  const [registry, setRegistry] = useState<StationMeta[] | null>(null);
+  const [readings, setReadings] = useState<Record<string, StationReading | null>>({});
   const [error, setError] = useState<string | null>(null);
   const [unit, setUnit] = useState<WindUnit>(loadWindUnit);
   const [openId, setOpenId] = useState<string | null>(null);
 
+  // Load registry once.
   useEffect(() => {
     let alive = true;
-    fetchStations()
-      .then((s) => alive && setStations(s))
+    fetchStationRegistry()
+      .then((r) => alive && setRegistry(r))
       .catch((e) => alive && setError(e instanceof Error ? e.message : 'failed'));
     return () => {
       alive = false;
     };
   }, []);
+
+  // Poll live readings direct from source, real-time. Pause when tab hidden.
+  useEffect(() => {
+    if (!registry || registry.length === 0) return;
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = async () => {
+      if (document.hidden) {
+        timer = setTimeout(tick, LIVE_POLL_MS);
+        return;
+      }
+      const r = await fetchLiveAll(registry);
+      if (!alive) return;
+      setReadings(r);
+      timer = setTimeout(tick, LIVE_POLL_MS);
+    };
+    void tick();
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [registry]);
 
   const setUnitPersist = useCallback((u: WindUnit) => {
     setUnit(u);
@@ -59,22 +88,29 @@ export function WindView() {
         <UnitToggle unit={unit} onChange={setUnitPersist} />
       </div>
       <div className="px-4 pb-2 text-[12px] text-neutral-500">
-        Bay of Palma · {stations?.length ?? '…'} stations · measured
+        Bay of Palma · {registry?.length ?? '…'} stations · measured
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-        {error && !stations && <Centered>Couldn’t load stations — {error}</Centered>}
-        {!stations && !error && <Centered>Loading stations…</Centered>}
-        {stations && (
+        {error && !registry && <Centered>Couldn’t load stations — {error}</Centered>}
+        {!registry && !error && <Centered>Loading stations…</Centered>}
+        {registry && (
           <div className="grid grid-cols-2 gap-2.5">
-            {stations.map((s) => (
-              <StationCard key={s.id} station={s} unit={unit} onOpen={() => setOpenId(s.id)} />
+            {registry.map((m) => (
+              <StationCard key={m.id} meta={m} reading={readings[m.id] ?? null} unit={unit} onOpen={() => setOpenId(m.id)} />
             ))}
           </div>
         )}
       </div>
 
-      {openId && <StationDetail id={openId} unit={unit} onClose={() => setOpenId(null)} />}
+      {openId && (
+        <StationDetail
+          meta={registry?.find((m) => m.id === openId) ?? null}
+          reading={readings[openId] ?? null}
+          unit={unit}
+          onClose={() => setOpenId(null)}
+        />
+      )}
     </div>
   );
 }
@@ -95,84 +131,79 @@ function UnitToggle({ unit, onChange }: { unit: WindUnit; onChange: (u: WindUnit
   );
 }
 
-function StationCard({ station, unit, onOpen }: { station: Station; unit: WindUnit; onOpen: () => void }) {
-  const r = station.reading;
-  const online = !!r?.online;
-  const col = online ? windColor(r!.windKt) : '#5a6480';
+function StationCard({ meta, reading, unit, onOpen }: { meta: StationMeta; reading: StationReading | null; unit: WindUnit; onOpen: () => void }) {
+  const online = !!reading?.online;
+  const loading = reading === null;
+  const col = online ? windColor(reading!.windKt) : '#5a6480';
   return (
     <button
       onClick={onOpen}
-      className={`relative flex flex-col items-center rounded-2xl border border-[#1b2440] px-2.5 pb-3 pt-3.5 text-left transition-transform active:scale-[.98] ${
-        online ? '' : 'opacity-50'
+      className={`relative flex flex-col items-center rounded-2xl border border-[#1b2440] px-2.5 pb-2.5 pt-3.5 text-left transition-transform active:scale-[.98] ${
+        online || loading ? '' : 'opacity-50'
       }`}
       style={{ background: 'radial-gradient(130% 110% at 50% -10%, #13213c 0%, #0c1428 68%)' }}
     >
-      <div className="text-center text-[12.5px] font-semibold tracking-tight text-neutral-50">{station.name}</div>
-      <div className="mt-0.5 font-mono text-[8.5px] uppercase tracking-wide text-neutral-600">{station.place}</div>
+      <div className="text-center text-[12.5px] font-semibold tracking-tight text-neutral-50">{meta.name}</div>
+      <div className="mt-0.5 font-mono text-[8.5px] uppercase tracking-wide text-neutral-600">{meta.place}</div>
 
-      <div className="relative my-2.5 h-[132px] w-[132px]">
-        <WindRosette dir={r?.dir ?? 0} windKt={r?.windKt ?? 0} online={online} />
+      <div className="relative my-2 h-[150px] w-[150px]">
+        <WindRosette dir={reading?.dir ?? 0} windKt={reading?.windKt ?? 0} online={online} size={150} />
+        {/* center stack: wind (hero) + gust (smaller, below, inside) */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div className="font-mono text-[40px] font-extralight leading-[.9] tracking-tight tabular-nums" style={{ color: col }}>
-            {online ? toUnit(r!.windKt, unit) : '—'}
+          <div className="font-mono text-[42px] font-extralight leading-[.85] tracking-tight tabular-nums" style={{ color: col }}>
+            {online ? fmtSpeed(reading!.windKt, unit) : loading ? '·' : '—'}
           </div>
-          <div className="mt-1 font-mono text-[8.5px] font-semibold tracking-[1.5px] text-neutral-500">
-            {online ? `${unitLabel(unit)} · ${compass(r!.dir)}` : 'OFFLINE'}
-          </div>
-          {online && <div className="mt-0.5 font-mono text-[9px] font-semibold tabular-nums text-neutral-500">{r!.dir}°</div>}
+          {online && reading!.gustKt != null && (
+            <div className="mt-1.5 font-mono text-[12px] font-semibold tabular-nums text-[#7fd02a]">
+              <span className="text-[9px] font-medium text-neutral-500">G</span> {fmtSpeed(reading!.gustKt, unit)}
+            </div>
+          )}
+          {!online && !loading && <div className="mt-1 font-mono text-[9px] tracking-widest text-neutral-600">OFFLINE</div>}
         </div>
       </div>
 
-      <div className="mt-1 flex items-center gap-2 font-mono text-[11px] font-semibold tabular-nums">
-        {online && r!.gustKt != null ? (
-          <>
-            <span className="text-[#7fd02a]">
-              gust <b className="text-[#7fd02a]">{toUnit(r!.gustKt, unit)}</b>
-            </span>
-            <span className="h-[3px] w-[3px] rounded-full bg-[#1b2440]" />
-            <span className="flex items-center gap-1 text-neutral-600">
-              <span className="h-[5px] w-[5px] rounded-full bg-emerald-400 shadow-[0_0_5px_#34d399]" />
-              {freshness(r!.observedAt)}
-            </span>
-          </>
-        ) : (
-          <span className="text-neutral-600">no signal</span>
-        )}
-      </div>
+      {/* direction outside, below the ring: degrees + letter */}
+      {online ? (
+        <div className="flex items-baseline gap-1.5 font-mono tabular-nums">
+          <span className="text-[15px] font-semibold text-neutral-100">{reading!.dir}°</span>
+          <span className="text-[11px] font-medium text-neutral-500">{compass(reading!.dir)}</span>
+        </div>
+      ) : (
+        <div className="font-mono text-[11px] text-neutral-600">{loading ? 'loading…' : 'no signal'}</div>
+      )}
     </button>
   );
 }
 
-function StationDetail({ id, unit, onClose }: { id: string; unit: WindUnit; onClose: () => void }) {
-  const [data, setData] = useState<{ station: StationMeta; reading: StationReading | null; hour: WindHistoryPoint[]; day: WindHistoryPoint[] } | null>(null);
+function StationDetail({ meta, reading, unit, onClose }: { meta: StationMeta | null; reading: StationReading | null; unit: WindUnit; onClose: () => void }) {
+  const [hist, setHist] = useState<{ hour: WindHistoryPoint[]; day: WindHistoryPoint[] } | null>(null);
   const [range, setRange] = useState<'1' | '6' | '12' | '24'>('1');
+  const liveReading = useRef(reading);
+  liveReading.current = reading; // keep latest poll value for the header
 
   useEffect(() => {
+    if (!meta) return;
     let alive = true;
-    setData(null);
-    fetchStationDetail(id).then((d) => alive && setData(d)).catch(() => {});
+    setHist(null);
+    fetchStationHistory(meta.id).then((h) => alive && setHist(h)).catch(() => {});
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [meta]);
 
-  // 1h = minute series; 6/12/24h = slices of the hourly (24h) series.
   const points = useMemo<WindHistoryPoint[]>(() => {
-    if (!data) return [];
-    if (range === '1') return data.hour;
-    const hours = Number(range);
-    return data.day.slice(Math.max(0, data.day.length - hours));
-  }, [data, range]);
+    if (!hist) return [];
+    if (range === '1') return hist.hour;
+    return hist.day.slice(Math.max(0, hist.day.length - Number(range)));
+  }, [hist, range]);
 
-  // Convert knots → display unit for the chart.
   const dispPoints = useMemo<WindHistoryPoint[]>(
     () => points.map((p) => ({ ...p, windSpeed: toUnit(p.windSpeed, unit), windGust: p.windGust != null ? toUnit(p.windGust, unit) : null })),
     [points, unit],
   );
 
-  const r = data?.reading;
-  const online = !!r?.online;
-  const col = online ? windColor(r!.windKt) : '#8a93a8';
+  const online = !!reading?.online;
+  const col = online ? windColor(reading!.windKt) : '#8a93a8';
 
   return (
     <div className="absolute inset-0 z-30 flex flex-col justify-end" role="dialog" aria-modal="true">
@@ -180,24 +211,20 @@ function StationDetail({ id, unit, onClose }: { id: string; unit: WindUnit; onCl
       <div className="relative z-10 max-h-[80%] overflow-y-auto rounded-t-2xl border-t border-[#1b2440] bg-[#0d1422] pb-[env(safe-area-inset-bottom)]">
         <div className="sticky top-0 flex items-center justify-between border-b border-[#161f2e] bg-[#0d1422] px-[18px] py-3.5">
           <div>
-            <div className="text-[17px] font-semibold text-neutral-50">{data?.station.name ?? '…'}</div>
-            <div className="mt-0.5 font-mono text-[11px] uppercase tracking-wide text-neutral-500">{data?.station.place ?? ''}</div>
+            <div className="text-[17px] font-semibold text-neutral-50">{meta?.name ?? '…'}</div>
+            <div className="mt-0.5 font-mono text-[11px] uppercase tracking-wide text-neutral-500">{meta?.place ?? ''}</div>
           </div>
-          <button className="text-xs text-neutral-400" onClick={onClose}>
-            Done
-          </button>
+          <button className="text-xs text-neutral-400" onClick={onClose}>Done</button>
         </div>
 
         <div className="flex items-center gap-[18px] px-[18px] pb-2 pt-4">
           <div className="font-mono text-[46px] font-extralight leading-none tabular-nums" style={{ color: col }}>
-            {online ? toUnit(r!.windKt, unit) : '—'}
+            {online ? fmtSpeed(reading!.windKt, unit) : '—'}
           </div>
           <div className="flex flex-col gap-[3px] font-mono text-[11px] font-semibold text-neutral-500">
-            <span>
-              {unitLabel(unit)} <b className="text-neutral-50">{online ? `${compass(r!.dir)} ${r!.dir}°` : '—'}</b>
-            </span>
-            <span className="text-[#7fd02a]">gust <b className="text-[#7fd02a]">{online && r!.gustKt != null ? `${toUnit(r!.gustKt, unit)} ${unitLabel(unit).toLowerCase()}` : '—'}</b></span>
-            <span>updated <b className="text-neutral-50">{freshness(r?.observedAt ?? null)}</b></span>
+            <span>{unitLabel(unit)} <b className="text-neutral-50">{online ? `${compass(reading!.dir)} ${reading!.dir}°` : '—'}</b></span>
+            <span className="text-[#7fd02a]">gust <b className="text-[#7fd02a]">{online && reading!.gustKt != null ? `${fmtSpeed(reading!.gustKt, unit)} ${unitLabel(unit).toLowerCase()}` : '—'}</b></span>
+            <span className="flex items-center gap-1.5">live <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" /></span>
           </div>
         </div>
 
@@ -216,7 +243,7 @@ function StationDetail({ id, unit, onClose }: { id: string; unit: WindUnit; onCl
         </div>
 
         <div className="px-3.5 pt-1">
-          {!data ? (
+          {!hist ? (
             <div className="flex h-[150px] items-center justify-center text-[11px] text-neutral-600">Loading…</div>
           ) : (
             <WindHistoryChart points={dispPoints} tz={'Europe/Madrid'} height={150} />
@@ -230,14 +257,6 @@ function StationDetail({ id, unit, onClose }: { id: string; unit: WindUnit; onCl
       </div>
     </div>
   );
-}
-
-function freshness(d: Date | null): string {
-  if (!d) return '—';
-  const mins = Math.round((Date.now() - d.getTime()) / 60000);
-  if (mins <= 0) return 'now';
-  if (mins < 60) return `${mins}m`;
-  return `${Math.floor(mins / 60)}h`;
 }
 
 function Centered({ children }: { children: React.ReactNode }) {

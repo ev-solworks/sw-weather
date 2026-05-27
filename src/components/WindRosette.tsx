@@ -1,12 +1,13 @@
 /**
- * WindRosette — the "Sweep" wind rosette. Thick track ring, a colored arc centred
- * on the wind's FROM-bearing, N/E/S/W letters, and a bold pointer at the bearing.
- * Wind speed sits centered inside; colour ramps with strength (knots). Offline
- * renders muted with no arc/arrow.
+ * WindRosette — the "Sweep" rosette. Track ring + a colored arc centred on the
+ * wind's FROM-bearing, N/E/S/W letters, and a smooth arrowhead at the bearing.
+ * Colour ramps with wind strength (knots). Offline = muted, no arc/arrow.
+ * The numeric readout (speed/gust/direction) is overlaid by the caller.
  */
 
-const C = 66; // center (viewBox 132)
-const R = 56;
+const VB = 140; // viewBox
+const C = VB / 2;
+const R = 60;
 
 /** Wind colour ramp by knots: calm slate → green → yellow → orange → magenta. */
 export function windColor(kt: number): string {
@@ -18,7 +19,7 @@ export function windColor(kt: number): string {
   return '#cf3290';
 }
 
-/** SVG arc path from a0→a1 degrees (0 = N, clockwise) at radius r. */
+/** SVG arc path a0→a1 degrees (0 = N, clockwise) at radius r. */
 function arcPath(r: number, a0: number, a1: number): string {
   const p = (a: number) => {
     const ra = ((a - 90) * Math.PI) / 180;
@@ -31,16 +32,16 @@ function arcPath(r: number, a0: number, a1: number): string {
 }
 
 function letters() {
-  const lr = R - 10;
+  const lr = R - 11;
   const L = (t: string, a: number) => {
     const ra = (a * Math.PI) / 180;
     return (
       <text
         key={t}
         x={(C + Math.sin(ra) * lr).toFixed(1)}
-        y={(C - Math.cos(ra) * lr + 3).toFixed(1)}
+        y={(C - Math.cos(ra) * lr + 3.2).toFixed(1)}
         textAnchor="middle"
-        fontSize="8"
+        fontSize="8.5"
         fontWeight="700"
         fill="#5e6a8c"
         fontFamily="ui-monospace, monospace"
@@ -52,6 +53,24 @@ function letters() {
   return [L('N', 0), L('E', 90), L('S', 180), L('W', 270)];
 }
 
+/**
+ * A smooth, kite-shaped arrowhead pointing inward (toward centre) at 12 o'clock,
+ * to be rotated to the bearing. Concave tail edges + a rounded join read as a
+ * proper arrow rather than a flat triangle. Tip near the ring, sitting on it.
+ */
+function arrowHead(col: string) {
+  const tipY = C - R + 16; // inner tip
+  const baseY = C - R - 4; // outer base (just outside ring)
+  const w = 11; // half-width at base
+  // tip → right base → concave curve back to a short neck → left base → close
+  const d =
+    `M ${C} ${tipY} ` +
+    `L ${C + w} ${baseY} ` +
+    `Q ${C} ${baseY - 5} ${C - w} ${baseY} ` +
+    `Z`;
+  return <path d={d} fill={col} strokeLinejoin="round" />;
+}
+
 interface Props {
   dir: number; // FROM bearing, degrees
   windKt: number; // for colour
@@ -59,18 +78,14 @@ interface Props {
   size?: number;
 }
 
-export function WindRosette({ dir, windKt, online, size = 132 }: Props) {
+export function WindRosette({ dir, windKt, online, size = 150 }: Props) {
   const col = online ? windColor(windKt) : '#2a3550';
   return (
-    <svg viewBox="0 0 132 132" width={size} height={size} aria-hidden style={{ position: 'absolute', inset: 0 }}>
-      <circle cx={C} cy={C} r={R} fill="none" stroke="#222d44" strokeWidth="6" />
-      {online && <path d={arcPath(R, dir - 44, dir + 44)} fill="none" stroke={col} strokeWidth="6" strokeLinecap="round" />}
+    <svg viewBox={`0 0 ${VB} ${VB}`} width={size} height={size} aria-hidden style={{ position: 'absolute', inset: 0 }}>
+      <circle cx={C} cy={C} r={R} fill="none" stroke="#212c48" strokeWidth="6" />
+      {online && <path d={arcPath(R, dir - 46, dir + 46)} fill="none" stroke={col} strokeWidth="6" strokeLinecap="round" />}
       {letters()}
-      {online && (
-        <g transform={`rotate(${dir} ${C} ${C})`}>
-          <path d={`M${C} ${C - 48} L${C - 10} ${C - 67} L${C + 10} ${C - 67} Z`} fill={col} />
-        </g>
-      )}
+      {online && <g transform={`rotate(${dir} ${C} ${C})`}>{arrowHead(col)}</g>}
     </svg>
   );
 }
