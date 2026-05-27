@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>SW Weather — Today</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  html, body { margin: 0; padding: 0; background: #f5f5f4; height: 100%; font-family: 'Inter', sans-serif; }
+  * { box-sizing: border-box; }
+  /* Notes column inside artboards */
+  .rationale { padding: 28px 32px; background: #fafafa; color: #29261b; height: 100%; overflow: auto; font-size: 14px; line-height: 1.6; }
+  .rationale h2 { font-size: 16px; font-weight: 600; margin: 0 0 4px; letter-spacing: -0.2px; }
+  .rationale .sub { color: #8a8275; font-size: 12px; margin-bottom: 20px; }
+  .rationale h3 { font-size: 12px; font-weight: 600; margin: 18px 0 6px; text-transform: uppercase; letter-spacing: 0.8px; color: #5e5848; }
+  .rationale ul { padding-left: 18px; margin: 0 0 12px; }
+  .rationale li { margin-bottom: 8px; }
+  .rationale code { background: #efece4; padding: 1px 5px; border-radius: 3px; font-size: 12px; font-family: 'JetBrains Mono', monospace; }
+  .rationale .swatch { display: inline-flex; align-items: center; gap: 6px; margin-right: 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .rationale .sw { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="forecast-data.js"></script>
+<script src="theme.js"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="wx-icon.jsx"></script>
+<script type="text/babel" src="weather-backdrop.jsx"></script>
+<script type="text/babel" src="today-horizontal.jsx"></script>
+<script type="text/babel" src="today-vertical.jsx"></script>
+<script type="text/babel" src="today-windguru.jsx"></script>
+<script type="text/babel" src="today-graph.jsx"></script>
+<script type="text/babel" src="today-sun.jsx"></script>
+<script type="text/babel" src="today-week.jsx"></script>
+<script type="text/babel" src="today-visual.jsx"></script>
+<script type="text/babel" src="home-view.jsx"></script>
+
+<script type="text/babel">
+const PHONE_W = 390;
+const PHONE_H = 844;
+
+const Phone = ({ children, label }) => (
+  <div data-screen-label={label} style={{
+    width: PHONE_W, height: PHONE_H, background: '#0a0a0a',
+    borderRadius: 44, overflow: 'hidden', position: 'relative',
+    boxShadow: '0 1px 3px rgba(0,0,0,.3), 0 24px 60px rgba(0,0,0,.18), 0 0 0 1px rgba(0,0,0,.08)',
+  }}>
+    {/* Status bar */}
+    <div style={{
+      position: 'absolute', top: 0, left: 0, right: 0, height: 54, zIndex: 10,
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '14px 28px 0',
+      fontFamily: '-apple-system, system-ui', fontSize: 15, fontWeight: 600, color: '#fafafa',
+    }}>
+      <span style={{fontVariantNumeric:'tabular-nums'}}>14:00</span>
+      <span style={{display:'flex',gap:5,alignItems:'center'}}>
+        <svg width="17" height="11" viewBox="0 0 17 11"><rect x="0" y="6.5" width="3" height="4" rx=".6" fill="#fafafa"/><rect x="4.5" y="4" width="3" height="6.5" rx=".6" fill="#fafafa"/><rect x="9" y="2" width="3" height="8.5" rx=".6" fill="#fafafa"/><rect x="13.5" y="0" width="3" height="10.5" rx=".6" fill="#fafafa"/></svg>
+        <svg width="24" height="11" viewBox="0 0 24 11"><rect x=".5" y=".5" width="20" height="10" rx="3" stroke="#fafafa" strokeOpacity=".4" fill="none"/><rect x="2" y="2" width="17" height="7" rx="1.5" fill="#fafafa"/></svg>
+      </span>
+    </div>
+    {/* Notch */}
+    <div style={{
+      position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)',
+      width: 118, height: 34, borderRadius: 22, background: '#000', zIndex: 20,
+    }}/>
+    <div style={{position:'absolute',top:54,left:0,right:0,bottom:0}}>
+      {children}
+    </div>
+    {/* Home indicator */}
+    <div style={{
+      position:'absolute',bottom:8,left:'50%',transform:'translateX(-50%)',
+      width:130,height:5,borderRadius:3,background:'rgba(255,255,255,0.6)',zIndex:30,
+    }}/>
+  </div>
+);
+
+// Build a forecast slice whose "now" hour matches a given description, so the
+// visual variants below show every backdrop without rewriting data.
+// Prefer the actual current hour if it matches; otherwise pick the first
+// daytime hour (8–18) with that description, falling back to any match.
+const sliceForDesc = (desc) => {
+  const target = desc.toLowerCase();
+  const all = window.PALMA_FORECAST;
+  const nowIdx = all.findIndex((h) => h.time.getTime() === window.PALMA_LOCATION.now.getTime());
+  if (nowIdx >= 0 && all[nowIdx].description.toLowerCase() === target) {
+    return { hours: all, now: window.PALMA_LOCATION.now };
+  }
+  const dayIdx = all.findIndex((h) => h.description.toLowerCase() === target && h.time.getHours() >= 8 && h.time.getHours() < 19);
+  const idx = dayIdx >= 0 ? dayIdx : all.findIndex((h) => h.description.toLowerCase() === target);
+  if (idx < 0) return { hours: all, now: window.PALMA_LOCATION.now };
+  const hours = all.slice(idx).concat(all.slice(0, idx));
+  return { hours, now: hours[0].time };
+};
+
+const Rationale = () => (
+  <div className="rationale">
+    <h2>SW Weather · Home + Today</h2>
+    <div className="sub">Centered, visual Today with motion backdrops + a Home / saved-locations dashboard. The dense table views from v1 stay below.</div>
+
+    <h3>What's new</h3>
+    <ul>
+      <li><b>Motion backdrops</b>: each backdrop is a CSS-keyframe stack (rain streaks, drifting snow, blurred cloud blobs, rotating sun rays, fog bands, twinkling stars at night). Palette is keyed off the description + hour, so a dawn rain reads differently from a daytime rain.</li>
+      <li><b>Centered hero</b>: big condition glyph at 120px, then the temperature, condition name, hi/lo. An "up next" pill calls out the next weather event in plain English ("Rain incoming · in 3h").</li>
+      <li><b>Hourly strip</b>: 12 forward hours, mono numerics, rain % shown only when ≥30%. Current hour gets a soft elevated pill so you can see "where am I" at a glance.</li>
+      <li><b>Home</b>: stack of saved-locations. Featured city (My Location) is taller and carries an inline 6-hour temperature strip. Every card pulls its own motion backdrop — flipping through it feels like flipping postcards.</li>
+    </ul>
+
+    <h3>Per-condition palettes</h3>
+    <ul>
+      <li><span className="swatch"><span className="sw" style={{background:'#1f3b6e'}}/>Clear day</span> warm-tinted radial + slow rotating ray spokes + soft pulse glow</li>
+      <li><span className="swatch"><span className="sw" style={{background:'#0f1a36'}}/>Clear night</span> deep navy, twinkling star field, simple moon disc</li>
+      <li><span className="swatch"><span className="sw" style={{background:'#28406d'}}/>Partly</span> clear backdrop + 2 large drifting blurred cloud blobs</li>
+      <li><span className="swatch"><span className="sw" style={{background:'#2c3344'}}/>Cloudy</span> 4 stacked blobs at varied speeds — no sun layer</li>
+      <li><span className="swatch"><span className="sw" style={{background:'#1d2c44'}}/>Rain</span> 38 slanted streaks falling at varied speeds; cooler sky</li>
+      <li><span className="swatch"><span className="sw" style={{background:'#142136'}}/>Heavy rain</span> 70 streaks + occasional subtle lightning flash overlay</li>
+      <li><span className="swatch"><span className="sw" style={{background:'#384258'}}/>Snow</span> 50 flakes drifting slowly with rotation</li>
+      <li><span className="swatch"><span className="sw" style={{background:'#3a3f49'}}/>Fog</span> 4 horizontal blurred bands sliding sideways at different phases</li>
+    </ul>
+
+    <h3>Original "v1" layouts (kept below)</h3>
+    <ul>
+      <li>Vertical timeline + horizontal data table from the first round, untouched. Same data; useful when the user wants numbers, not vibes. Could surface as a "Details" toggle.</li>
+    </ul>
+
+    <h3>Layout decisions</h3>
+    <ul>
+      <li><b>A — Horizontal table</b>: each metric is a row, hours scroll left/right in sync. Dense, Windguru-feel. Best for skimming <i>one</i> dimension across time (e.g. "when does it rain?"). Sticky left-column labels keep context while scrolling.</li>
+      <li><b>B — Vertical timeline</b>: each row is one hour, all metrics laid out in columns. Scrolls under the thumb. Best for reading a <i>specific</i> hour ("what'll 19:00 be like?") and naturally one-handed.</li>
+      <li><b>Recommendation</b>: ship B as default — vertical scroll is more intuitive on phones and the rain band reads as a continuous tinted stripe. Keep A reachable via a "table view" toggle for power users.</li>
+    </ul>
+
+    <h3>How "now" is marked</h3>
+    <ul>
+      <li>2px white left-edge bar with subtle glow — survives any background tint.</li>
+      <li>Slight bg lift on the now row/column so it reads as elevated.</li>
+      <li>Time label flips to white + 600 weight; on B, a NOW · 14:00 monospace tag sits above the big temperature.</li>
+      <li>List auto-scrolls so "now" is the first visible item on mount.</li>
+    </ul>
+
+    <h3>How rainy hours are emphasized</h3>
+    <ul>
+      <li>Background tint scales with probability — that's the headline. The rain block hours +3 to +7 fills the row with progressively stronger blue, so it's a single visible "weather event" stripe rather than 5 separate cells.</li>
+      <li>Below 20% the cell is bare (a muted "·" or grey number) — keeps the eye off non-events.</li>
+      <li>Amount in mm only renders when {'>'} 0; it's intentionally smaller and slightly bluer than the percent.</li>
+      <li>≥80% adds a small drop indicator in B, and the percent text gets the highest-contrast cyan.</li>
+    </ul>
+    <div style={{marginTop:6,marginBottom:10}}>
+      <span className="swatch"><span className="sw" style={{background:'#1f1f1f'}}/>0–20</span>
+      <span className="swatch"><span className="sw" style={{background:'rgba(56,114,224,0.45)'}}/>20–50</span>
+      <span className="swatch"><span className="sw" style={{background:'rgba(56,142,232,0.6)'}}/>50–80</span>
+      <span className="swatch"><span className="sw" style={{background:'rgba(56,189,248,0.85)'}}/>80–100</span>
+    </div>
+
+    <h3>Day boundaries</h3>
+    <ul>
+      <li>A: a thin vertical dashed rule with a small uppercase day label (TUE, WED) sitting at the column break in every row.</li>
+      <li>B: full-width section break with a heavier uppercase line ("Tuesday · 10 Feb").</li>
+      <li>The 00:00 hour itself gets the day label — never a midnight ambiguity.</li>
+    </ul>
+
+    <h3>Data treatment</h3>
+    <ul>
+      <li><code>JetBrains Mono</code> on all numerics — alignment for tabular reading.</li>
+      <li>Wind: arrow points <i>where the wind is going</i> (deg + 180°). Opacity scales with strength so calm hours don't shout. Gust shown only when ≥12 km/h above sustained, in amber.</li>
+      <li>UV: official WHO color scale (green / yellow / orange / red / purple). UV 0 collapses to a muted em-dash so nighttime hours read as empty.</li>
+      <li>Cloud: small 4×24 vertical bar fill — 0–100% in one glance, no number-heavy clutter.</li>
+      <li>Conditions in A use 2-letter monospace placeholders (PC, LR, RA, HR) so an icon-set swap is a single component change.</li>
+    </ul>
+
+    <h3>Type contract</h3>
+    <p style={{margin:'4px 0 0',fontSize:12,color:'#5e5848'}}>Both components take <code>{'{ hours: HourForecast[]; location: { name; summary }; now: Date }'}</code>. Field names match your interface exactly.</p>
+  </div>
+);
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "theme": "navy",
+  "bands": true
+}/*EDITMODE-END*/;
+
+const App = () => {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const T = window.SW_THEMES[t.theme] || window.SW_THEMES.black;
+
+  // Picks for the visual Today variants — each shows a different motion backdrop.
+  const visualVariants = [
+    { id: 'vis-clear',  label: 'Visual · Clear (current)', desc: 'Clear' },
+    { id: 'vis-rain',   label: 'Visual · Rain',            desc: 'Rain' },
+    { id: 'vis-heavy',  label: 'Visual · Heavy rain',      desc: 'Heavy rain' },
+    { id: 'vis-cloud',  label: 'Visual · Cloudy',          desc: 'Cloudy' },
+    { id: 'vis-partly', label: 'Visual · Partly cloudy',   desc: 'Partly cloudy' },
+  ];
+
+  return (
+  <>
+  <DesignCanvas initialZoom={0.5}>
+    <DCSection id="home" title="Home" subtitle="Saved-locations dashboard · each card carries its own motion backdrop">
+      <DCArtboard id="home-main" label="Home · Saved locations" width={PHONE_W} height={PHONE_H} style={{background:T.bg,borderRadius:44}}>
+        <Phone label="Home">
+          <HomeView now={window.PALMA_LOCATION.now}/>
+        </Phone>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection id="today-visual" title="Today · Visual" subtitle="Centered hero with motion backdrops keyed to current conditions">
+      {visualVariants.map((v) => {
+        const slice = sliceForDesc(v.desc);
+        return (
+          <DCArtboard key={v.id} id={v.id} label={v.label} width={PHONE_W} height={PHONE_H} style={{background:'#0a0a0a',borderRadius:44}}>
+            <Phone label={`Today · ${v.desc}`}>
+              <TodayVisual hours={slice.hours} location={window.PALMA_LOCATION} now={slice.now}/>
+            </Phone>
+          </DCArtboard>
+        );
+      })}
+      <DCArtboard id="notes" label="Design rationale" width={520} height={PHONE_H} style={{background:'#fafafa',borderRadius:8}}>
+        <Rationale/>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection id="week" title="Week" subtitle="7-day forecast · temp-range chart + day rows with wind/wave/rain chips">
+      <DCArtboard id="week-main" label="Week · Forecast" width={PHONE_W} height={PHONE_H} style={{background:'#070b1a',borderRadius:44}}>
+        <Phone label="Week">
+          <TodayWeek days={window.PALMA_WEEK} location={window.PALMA_LOCATION} now={window.PALMA_LOCATION.now}/>
+        </Phone>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection id="today-data" title="Today · Data views" subtitle="Dense tables for the numbers nerds. Windguru-style is the new lead.">
+      <DCArtboard id="windguru" label="C · Windguru-style table" width={PHONE_W} height={PHONE_H} style={{background:'#070b1a',borderRadius:44}}>
+        <Phone label="Today · Windguru">
+          <TodayWindguru hours={window.PALMA_FORECAST} location={window.PALMA_LOCATION} now={window.PALMA_LOCATION.now}/>
+        </Phone>
+      </DCArtboard>
+      <DCArtboard id="graph" label="D · Graph mode" width={PHONE_W} height={PHONE_H} style={{background:'#070b1a',borderRadius:44}}>
+        <Phone label="Today · Graph">
+          <TodayGraph hours={window.PALMA_FORECAST} location={window.PALMA_LOCATION} now={window.PALMA_LOCATION.now}/>
+        </Phone>
+      </DCArtboard>
+      <DCArtboard id="sun" label="E · Sun &amp; Moon (new)" width={PHONE_W} height={PHONE_H} style={{background:'#070b1a',borderRadius:44}}>
+        <Phone label="Today · Sun">
+          <TodaySun location={window.PALMA_LOCATION} now={window.PALMA_LOCATION.now}/>
+        </Phone>
+      </DCArtboard>
+      <DCArtboard id="vertical" label="B · Vertical timeline" width={PHONE_W} height={PHONE_H} style={{background:T.bg,borderRadius:44}}>
+        <Phone label="Today · Vertical">
+          <TodayVertical hours={window.PALMA_FORECAST} location={window.PALMA_LOCATION} now={window.PALMA_LOCATION.now} theme={T} bands={t.bands}/>
+        </Phone>
+      </DCArtboard>
+      <DCArtboard id="horizontal" label="A · Horizontal (v1)" width={PHONE_W} height={PHONE_H} style={{background:T.bg,borderRadius:44}}>
+        <Phone label="Today · Horizontal">
+          <TodayHorizontal hours={window.PALMA_FORECAST} location={window.PALMA_LOCATION} now={window.PALMA_LOCATION.now} theme={T} bands={t.bands}/>
+        </Phone>
+      </DCArtboard>
+    </DCSection>
+  </DesignCanvas>
+  <TweaksPanel title="Tweaks">
+    <TweakSection label="Data views (v1)"/>
+    <TweakColor label="Theme" value={window.SW_THEMES[t.theme].bg}
+      options={Object.values(window.SW_THEMES).map(x => x.bg)}
+      onChange={(hex) => {
+        const key = Object.keys(window.SW_THEMES).find(k => window.SW_THEMES[k].bg === hex);
+        setTweak('theme', key);
+      }}/>
+    <TweakToggle label="Time-of-day tints" value={t.bands} onChange={(v) => setTweak('bands', v)}/>
+    <div style={{padding:'8px 4px 4px',fontSize:11,color:'#8a8275',lineHeight:1.4}}>
+      Applies to the v1 data-view artboards. The visual Today + Home use condition-driven palettes instead.
+    </div>
+  </TweaksPanel>
+  </>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

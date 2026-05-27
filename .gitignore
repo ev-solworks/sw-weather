@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+.bun/
+# Note: bun.lock (text lockfile) IS committed; only the old binary bun.lockb is ignored
+bun.lockb
+
+# Build output
+dist/
+dist-ssr/
+.vite/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# PWA generated
+public/sw.js
+public/workbox-*.js
+public/registerSW.js
+public/manifest.webmanifest
+
+# Misc
+*.local
