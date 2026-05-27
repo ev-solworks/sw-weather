@@ -35,7 +35,7 @@ import * as aemet from '@/services/aemet';
 import * as ipma from '@/services/ipma';
 import * as om from '@/services/openMeteo';
 import { computeMoonInfo, computeSunPhases } from '@/services/sun';
-import { fetchFromProxy, type ProxyPayloads } from '@/services/proxy';
+import { fetchFromProxy, type OceanDriversLive, type ProxyPayloads } from '@/services/proxy';
 
 function prov(source: SourceId, confidence: Confidence, model?: string): FieldProvenance {
   return { source, confidence, model, fetchedAt: new Date().toISOString() };
@@ -143,6 +143,23 @@ function parseAemetObs(payload: unknown): { ta: number | null; hr: number | null
   return null;
 }
 
+const KNOTS_TO_KMH = 1.852;
+
+/** Parse an OceanDrivers live reading → measured wind in km/h. Null if inactive/absent. */
+function parseOceanDrivers(
+  od: OceanDriversLive | undefined,
+): { windSpeed: number; windDirection: number; windGust: number | null; observedAt: Date | null; station: string } | null {
+  if (!od || od.ACTIVE === 'OFF' || typeof od.TWS !== 'number' || typeof od.TWD !== 'number') return null;
+  const gustKt = od.TWS_GUST ?? (od.TWS_GUST_MAX?.VALUE != null ? Number(od.TWS_GUST_MAX.VALUE) : null);
+  return {
+    windSpeed: Math.round(od.TWS * KNOTS_TO_KMH),
+    windDirection: Math.round(od.TWD),
+    windGust: gustKt != null && Number.isFinite(gustKt) ? Math.round(gustKt * KNOTS_TO_KMH) : null,
+    observedAt: od.TIME ? new Date(od.TIME) : null,
+    station: 'live-station',
+  };
+}
+
 /** Stamp the current temperature onto today's day row (drives the Week marker). */
 function stampTodayCurrent(days: DayForecast[], currentTemp: number): void {
   const today = days.find((d) => d.dayName === 'Today');
@@ -207,6 +224,14 @@ async function normalizeSpain(loc: Location, p: ProxyPayloads): Promise<WeatherC
   if (marine) {
     const marineConf: Confidence = loc.timezone === 'Atlantic/Canary' ? 'low' : 'medium';
     sources.marine = prov('open-meteo-marine', marineConf, 'best_match');
+  }
+
+  // Live measured wind from a nearby OceanDrivers station (Bay of Palma) — beats
+  // the AEMET forecast hour for current wind. Overlays current.wind* + provenance.
+  const live = parseOceanDrivers(p.oceandrivers);
+  if (live) {
+    current = { ...current, windSpeed: live.windSpeed, windDirection: live.windDirection, windGust: live.windGust ?? current.windGust, observedAt: live.observedAt ?? current.observedAt };
+    sources.wind = prov('oceandrivers', 'high', live.station);
   }
 
   return { location: loc, current, hours, days, sun, moon, alerts: [], sources, assembledAt: new Date().toISOString() };

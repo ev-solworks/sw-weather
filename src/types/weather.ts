@@ -28,6 +28,7 @@ export type SourceId =
   | 'open-meteo' // forecast API (Best Match / named models)
   | 'open-meteo-marine' // waves, sea-surface temp
   | 'open-meteo-aq' // pollen, AQI
+  | 'oceandrivers' // live measured station (Bay of Palma), ~2–10s updates
   | 'suncalc'; // locally computed sun/moon (no network)
 
 /**

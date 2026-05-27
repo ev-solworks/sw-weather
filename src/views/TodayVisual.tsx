@@ -130,7 +130,7 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
 
         {/* Metrics */}
         <div className="grid grid-cols-3 gap-2 px-4 pb-3.5 pt-2">
-          <Metric label="Wind" value={`${current.windSpeed}`} unit={`km/h ${compass(current.windDirection)}`} />
+          <Metric label="Wind" value={`${current.windSpeed}`} unit={`km/h ${compass(current.windDirection)}`} live={weather.sources.wind?.source === 'oceandrivers'} />
           <Metric label="Humidity" value={`${current.humidity}`} unit="%" />
           <Metric label="UV" value={`${uv}`} unit={uvLabel(uv)} />
         </div>
@@ -142,10 +142,18 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
   );
 }
 
-function Metric({ label, value, unit }: { label: string; value: string; unit: string }) {
+function Metric({ label, value, unit, live }: { label: string; value: string; unit: string; live?: boolean }) {
   return (
     <div className="flex flex-col gap-1 rounded-xl border border-[#1d2533] bg-[#131c2a] px-3 py-2.5">
-      <div className="font-mono text-[10px] font-semibold tracking-[1px] text-neutral-500">{label}</div>
+      <div className="flex items-center gap-1.5">
+        <div className="font-mono text-[10px] font-semibold tracking-[1px] text-neutral-500">{label}</div>
+        {live && (
+          <span className="flex items-center gap-0.5" title="Live measured station">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,.7)]" />
+            <span className="font-mono text-[8px] font-bold tracking-wide text-emerald-400">LIVE</span>
+          </span>
+        )}
+      </div>
       <div className="flex items-baseline gap-1">
         <span className="font-mono text-lg font-medium tabular-nums text-neutral-50">{value}</span>
         <span className="text-[10px] text-neutral-500">{unit}</span>

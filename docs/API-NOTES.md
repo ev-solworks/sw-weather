@@ -109,6 +109,49 @@ IPMA forecasts refresh ~9–10 AM and ~9–10 PM Lisbon local time. Our 6h TTL i
 
 ---
 
+## OceanDrivers — live wind stations (Bay of Palma)
+
+**Base:** `https://api.oceandrivers.com/v1.0`
+**Auth:** none. CORS open (`*`). Keyless.
+**What:** OceanDrivers "Ocean Web Weather" — private club weather stations around the
+Bay of Palma, updating every ~2–10s. MEASURED live data — beats AEMET forecast for
+local wind. Use for **current conditions** (wind especially) on Mallorca locations.
+
+### Live endpoint (verified 2026-05-27)
+```
+GET /getWeatherDisplay/{stationId}/        ← note: NO ?period param (that 500s)
+GET /getEasyWind/{stationId}/              ← for "EW"-prefixed EasyWind stations
+```
+Discovered from the station widget's `weatherStationModel.js` (Backbone model polled
+by `lib/backbone.poller`).
+
+### Station IDs = the subdomain name, LOWERCASE
+| Station | id | coords (from payload) |
+|---|---|---|
+| Real Club Náutico de Palma | `rcnp` | 39.567, 2.635 |
+| Club Marítimo San Antonio de la Playa | `cmsap` | 39.533, 2.716 |
+| CN Arenal | `cnarenal` | 39.5, 2.733 |
+| Club Náutico Cala Gamba | `cncg`? (unverified) | — |
+
+`rcnp` is the central Palma station → attach to the Palma location.
+
+### Payload fields (knots, °C, hPa)
+`TWS` true wind speed (kt) · `TWD` true wind dir (°) · `TWS_GUST` / `TWS_GUST_MAX {VALUE,TIME_STRING}` ·
+`TEMPERATURE` · `HUMIDITY` · `PRESSURE` + `PRESSURE_TR` (3h trend) · `RAIN` / `RAIN_DAY` / `RAIN_MONTH` ·
+`WINDCHILL` · `HUMIDEX` · `ICON_NOW`/`ICON_FOR` · `WEATHER_DES` · `LATITUDE`/`LONGITUDE` ·
+`ACTIVE` (ON/OFF) · `TIME`/`TIME_STRING`. **Wind is in KNOTS** — convert to km/h (×1.852) for our type.
+
+### Common mistakes
+- ❌ `?period=latest` → 500. Hit the bare `/getWeatherDisplay/{id}/`.
+- ❌ Uppercase / guessed IDs silently fall back to a default station's data. Use the exact lowercase subdomain id.
+- ❌ Treating TWS as km/h — it's knots.
+
+### Notes
+- Personal/low-volume use; cache server-side (proxy) and poll modestly. Revisit terms if the app goes public/commercial.
+- Future: a dedicated "live wind stations" feature (map of stations + live readings) — this endpoint supports it.
+
+---
+
 ## Future (Phase 2+)
 
 Not implemented yet. Add quirks here as they come up.

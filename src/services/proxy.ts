@@ -24,6 +24,20 @@ export class ProxyError extends Error {
   }
 }
 
+/** OceanDrivers live station reading (Bay of Palma). Wind in KNOTS. */
+export interface OceanDriversLive {
+  TWS?: number; // true wind speed (knots)
+  TWD?: number; // true wind direction (degrees)
+  TWS_GUST?: number; // gust (knots)
+  TWS_GUST_MAX?: { VALUE?: string; TIME_STRING?: string };
+  TEMPERATURE?: number;
+  HUMIDITY?: number;
+  PRESSURE?: number;
+  TIME?: number; // epoch ms
+  TIME_STRING?: string;
+  ACTIVE?: string; // 'ON' | 'OFF'
+}
+
 /** Raw payloads keyed by provider "kind", as returned by weather-get. */
 export interface ProxyPayloads {
   'aemet-hourly'?: [AemetForecastRoot<AemetHourlyDay>];
@@ -34,6 +48,7 @@ export interface ProxyPayloads {
   'om-forecast'?: OpenMeteoForecast;
   'om-marine'?: OpenMeteoMarine;
   'om-aq'?: OpenMeteoAirQuality;
+  oceandrivers?: OceanDriversLive;
 }
 
 export interface ProxyResponse {

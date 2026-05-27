@@ -14,7 +14,8 @@ export type WeatherKind =
   | 'ipma-sea'
   | 'om-forecast'
   | 'om-marine'
-  | 'om-aq';
+  | 'om-aq'
+  | 'oceandrivers';
 
 export interface LocationRow {
   id: string;
@@ -25,6 +26,7 @@ export interface LocationRow {
   aemet_municipio: string | null;
   aemet_station: string | null;
   ipma_global_id_local: number | null;
+  oceandrivers_station: string | null;
   is_coastal: boolean;
 }
 
@@ -131,6 +133,14 @@ export function omAirQuality(lat: number, lon: number, tz: string) {
   return omFetch(OM_AQ, { latitude: lat, longitude: lon, timezone: tz, hourly: 'european_aqi,pm10,pm2_5,alder_pollen,birch_pollen,grass_pollen,olive_pollen,ragweed_pollen' });
 }
 
+// OceanDrivers live station (Bay of Palma, keyless). Bare path — NO ?period.
+const OD_BASE = 'https://api.oceandrivers.com/v1.0';
+export async function oceanDriversLive(stationId: string): Promise<unknown> {
+  const res = await timedFetch(`${OD_BASE}/getWeatherDisplay/${stationId}/`);
+  if (!res.ok) throw new Error(`OceanDrivers ${stationId} ${res.status}`);
+  return res.json();
+}
+
 function haversine(la1: number, lo1: number, la2: number, lo2: number): number {
   const R = 6371, toRad = (x: number) => (x * Math.PI) / 180;
   const dLat = toRad(la2 - la1), dLon = toRad(lo2 - lo1);
@@ -151,6 +161,9 @@ export async function fetchAllForLocation(
   const tasks: Array<Promise<void>> = [];
   const run = (kind: WeatherKind, p: Promise<unknown>) =>
     tasks.push(p.then((v) => void (out[kind] = v)).catch(() => void (out[kind] = null)));
+
+  // Live station (any country) — measured current wind for the Bay of Palma.
+  if (loc.oceandrivers_station) run('oceandrivers', oceanDriversLive(loc.oceandrivers_station));
 
   if (loc.country === 'ES' && loc.aemet_municipio) {
     run('aemet-hourly', aemetHourly(loc.aemet_municipio, aemetKey));
