@@ -27,7 +27,26 @@ Every endpoint returns:
 
 ### Response encodings
 
-- AEMET responses are sometimes served as **`application/json` with Latin-1 bytes** despite claiming UTF-8. If you see `Mallorca` rendered as `Mallorca`, force-decode as `latin1` or `iso-8859-1` before `JSON.parse`. (Document the actual behavior here once we hit it.)
+- AEMET responses are sometimes served as **`application/json` with Latin-1 bytes** despite claiming UTF-8. If you see `Mallorca` rendered as `Mallorca`, force-decode as `latin1` or `iso-8859-1` before `JSON.parse`. Implemented in `aemet.ts` `decodeBody()`: decode UTF-8 first, and if the result contains U+FFFD (replacement char) re-decode as `iso-8859-1`.
+
+### Live-verified payload shapes (probed 2026-05-27, municipio 07040)
+
+Both forecast endpoints return a **single-element array**; real data is at `[0].prediccion.dia[]`.
+
+**Daily** (`/diaria/{municipio}`) — period-based, NOT hourly. Use for hi/lo, uvMax, day wind.
+- `dia[].fecha` — naive ISO `2026-05-27T00:00:00` (no TZ → interpret in location TZ).
+- `dia[].temperatura` — `{ maxima, minima, dato:[{value,hora}] }` (numbers; `dato` sparse at hours 6/12/18/24).
+- `dia[].uvMax` — number.
+- `dia[].estadoCielo` / `probPrecipitacion` / `viento` / `rachaMax` — arrays keyed by `periodo` (`00-24`, `00-12`, `12-24`, then 6h blocks). `estadoCielo` items have `{value, periodo, descripcion}`.
+
+**Hourly** (`/horaria/{municipio}`) — the real per-hour source (≈48h).
+- Values are **STRINGS** (`"19"`, `"0"`); empty string `""` = no data → null. (`aemet.ts` `aemetNum()`.)
+- `dia[].orto` / `dia[].ocaso` — sunrise/sunset `"HH:MM"`.
+- `estadoCielo.value` carries an `n` night suffix, e.g. `"17n"` → strip `n`, set `isNight`. (`parseSkyCode()`.)
+- Per-hour arrays (`temperatura`, `humedadRelativa`, `precipitacion`, `sensTermica`) keyed by `periodo` = hour `"03".."23"`.
+- `probPrecipitacion.periodo` is a **range** (`"0208"` = 02–08), different cadence — don't assume 1:1 with the hour.
+- `vientoAndRachaMax` **alternates**: a wind entry `{direccion:[..],velocidad:[..],periodo}` then a gust entry `{value,periodo}`, both with the same hour `periodo`. Pair by `periodo`. (`pairWind()`.)
+- `estadoCielo.value` codes seen: `11` Despejado, `12` Poco nuboso, `17` Nubes altas, `81` Niebla, `82` Bruma (+ `n` variants). Full code→ConditionCode map lives in `normalize.ts`.
 
 ### Endpoints used in Phase 1
 
