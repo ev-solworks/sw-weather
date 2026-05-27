@@ -35,6 +35,7 @@ import * as aemet from '@/services/aemet';
 import * as ipma from '@/services/ipma';
 import * as om from '@/services/openMeteo';
 import { computeMoonInfo, computeSunPhases } from '@/services/sun';
+import { fetchFromProxy, type ProxyPayloads } from '@/services/proxy';
 
 function prov(source: SourceId, confidence: Confidence, model?: string): FieldProvenance {
   return { source, confidence, model, fetchedAt: new Date().toISOString() };
@@ -135,16 +136,11 @@ function nearestHour(hours: HourForecast[], now = Date.now()): HourForecast {
 
 // ── Per-region assembly ──────────────────────────────────────────────────────
 
-async function normalizeSpain(loc: Location): Promise<WeatherConditions> {
-  if (!loc.aemetMunicipio) throw new Error(`ES location ${loc.id} missing aemetMunicipio`);
-
-  const [hourly, daily, marine, aq] = await Promise.all([
-    aemet.fetchHourly(loc.aemetMunicipio),
-    aemet.fetchDaily(loc.aemetMunicipio),
-    loc.isCoastal ? om.fetchMarine(loc.lat, loc.lon, loc.timezone).catch(() => null) : Promise.resolve(null),
-    om.fetchAirQuality(loc.lat, loc.lon, loc.timezone).catch(() => null),
-  ]);
-  void aq; // wired into a pollen/AQI block in a later stage
+async function normalizeSpain(loc: Location, p: ProxyPayloads): Promise<WeatherConditions> {
+  const hourly = p['aemet-hourly']?.[0];
+  const daily = p['aemet-daily']?.[0];
+  if (!hourly || !daily) throw new Error(`ES location ${loc.id}: missing AEMET data`);
+  const marine = p['om-marine'] ?? null;
 
   const hours = aemetHourlyToHours(hourly, marine, loc.timezone);
   const days = aemetDailyToDays(daily, loc.timezone);
@@ -169,19 +165,12 @@ async function normalizeSpain(loc: Location): Promise<WeatherConditions> {
   return { location: loc, current, hours, days, sun, moon, alerts: [], sources, assembledAt: new Date().toISOString() };
 }
 
-async function normalizePortugal(loc: Location): Promise<WeatherConditions> {
-  if (!loc.ipmaGlobalIdLocal) throw new Error(`PT location ${loc.id} missing ipmaGlobalIdLocal`);
-
-  const seaId = loc.isCoastal ? await ipma.nearestSeaLocation(loc.lat, loc.lon) : null;
-
-  const [ipmaDaily, weatherTypes, omForecast, marine, sea] = await Promise.all([
-    ipma.fetchDaily(loc.ipmaGlobalIdLocal),
-    ipma.fetchWeatherTypes(),
-    om.fetchForecast(loc.lat, loc.lon, loc.timezone),
-    loc.isCoastal ? om.fetchMarine(loc.lat, loc.lon, loc.timezone).catch(() => null) : Promise.resolve(null),
-    seaId ? ipma.fetchSea(seaId, 3).catch(() => null) : Promise.resolve(null),
-  ]);
-  void weatherTypes; // IPMA hourly text not used (hourly comes from OM); kept for daily sky below
+async function normalizePortugal(loc: Location, p: ProxyPayloads): Promise<WeatherConditions> {
+  const ipmaDaily = p['ipma-daily']?.data;
+  const omForecast = p['om-forecast'];
+  if (!ipmaDaily || !omForecast) throw new Error(`PT location ${loc.id}: missing forecast data`);
+  const marine = p['om-marine'] ?? null;
+  const sea = p['ipma-sea'] ?? null;
 
   // Hours: Open-Meteo (IPMA has no hourly). Waves: OM Marine fill.
   const hours = hoursFromOpenMeteo(omForecast, marine);
@@ -362,7 +351,8 @@ function indexSky(
 // ── Entry point ──────────────────────────────────────────────────────────────
 
 async function assemble(loc: Location): Promise<WeatherConditions> {
-  return loc.country === 'ES' ? normalizeSpain(loc) : normalizePortugal(loc);
+  const { payloads } = await fetchFromProxy(loc.id);
+  return loc.country === 'ES' ? normalizeSpain(loc, payloads) : normalizePortugal(loc, payloads);
 }
 
 /**

@@ -28,6 +28,14 @@ is the app that depends on them.
 - `weather_cache` — `(location_id, kind) → payload, fetched_at`. Public read,
   service-role write.
 
+## Client env (sw-weather-app `.env` — both PUBLIC, safe in the bundle)
+```
+VITE_SUPABASE_URL=https://jmsvejlsbijpbeoxnkrs.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_biJ9vCfSEkSipkP0Llm9_w_t80mjTSF
+```
+The client (`src/services/proxy.ts`) calls `weather-get` with the anon key; the
+old `VITE_AEMET_API_KEY` is no longer used client-side (it's the edge secret now).
+
 ## Redeploy
 Via the Supabase MCP `deploy_edge_function`, or the CLI:
 `supabase functions deploy weather-get --project-ref jmsvejlsbijpbeoxnkrs`
