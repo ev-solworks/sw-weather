@@ -6,6 +6,7 @@ This file is loaded into every Claude Code session in this directory. Keep it te
 
 SW Weather is a personal weather PWA for SOLWORKS. It replaces eltiempo.es with a clean, ad-free, dark-mode UI and professional-grade forecasts for **Spain (incl. Canary Islands)** and **Portugal (incl. Azores/Madeira)**. Eventually wraps as a native iOS app via Capacitor for an AR sun/moon tracker (the only feature that actually needs native sensors).
 
+Build plan (living): [.planning/BUILD-PLAN.md](.planning/BUILD-PLAN.md)
 Full architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 Data sources & blend: [docs/DATA-SOURCES-RESEARCH.md](docs/DATA-SOURCES-RESEARCH.md)
 API gotchas: [docs/API-NOTES.md](docs/API-NOTES.md)
