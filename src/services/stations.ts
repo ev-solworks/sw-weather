@@ -68,9 +68,9 @@ async function proxyCall(params = ''): Promise<unknown> {
 
 type RawStation = { id: string; name: string; place: string; region: string; lat: number; lon: number; source: string; ext_id: string };
 
-/** Station list + metadata (no live — that's fetched direct). */
+/** Station list + metadata (no live — that's fetched direct). Fast DB-only read. */
 export async function fetchStationRegistry(): Promise<StationMeta[]> {
-  const body = (await proxyCall()) as { stations: (RawStation & { live?: unknown })[] };
+  const body = (await proxyCall('?meta')) as { stations: (RawStation & { live?: unknown })[] };
   return body.stations.map((s) => ({
     id: s.id, name: s.name, place: s.place, region: s.region, lat: s.lat, lon: s.lon, source: s.source, extId: s.ext_id,
   }));
@@ -90,12 +90,6 @@ export async function fetchLiveDirect(meta: StationMeta): Promise<StationReading
   } catch {
     return null;
   }
-}
-
-/** Live readings for many stations in parallel, keyed by station id. */
-export async function fetchLiveAll(metas: StationMeta[]): Promise<Record<string, StationReading | null>> {
-  const entries = await Promise.all(metas.map(async (m) => [m.id, await fetchLiveDirect(m)] as const));
-  return Object.fromEntries(entries);
 }
 
 // ── History (via proxy, cached) ───────────────────────────────────────────────
@@ -163,3 +157,30 @@ export function splitSpeed(kt: number, unit: WindUnit): { int: string; dec: stri
   return { int, dec };
 }
 export const unitLabel = (u: WindUnit): string => (u === 'kt' ? 'KN' : 'KM/H');
+
+// ── station order (user-reorderable, persisted) ──────────────────────────────
+const ORDER_KEY = 'sw.weather.stationOrder';
+
+function loadOrder(): string[] {
+  try {
+    const raw = globalThis.localStorage?.getItem(ORDER_KEY);
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+export function saveOrder(ids: string[]): void {
+  try {
+    globalThis.localStorage?.setItem(ORDER_KEY, JSON.stringify(ids));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Apply the saved order to a registry; unknown/new stations keep their default tail. */
+export function applyOrder(metas: StationMeta[]): StationMeta[] {
+  const order = loadOrder();
+  if (!order.length) return metas;
+  const rank = new Map(order.map((id, i) => [id, i]));
+  return [...metas].sort((a, b) => (rank.get(a.id) ?? 999) - (rank.get(b.id) ?? 999));
+}

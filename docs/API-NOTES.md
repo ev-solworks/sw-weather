@@ -160,6 +160,15 @@ Wired as the `oceandrivers-history` proxy kind → `WeatherConditions.windHistor
 - Personal/low-volume use; cache server-side (proxy) and poll modestly. Revisit terms if the app goes public/commercial.
 - Future: a dedicated "live wind stations" feature (map of stations + live readings) — this endpoint supports it.
 
+## Windguru station widgets — NOT cleanly pullable
+Sites like kiteandyogamallorca.com embed a **Windguru station widget** (e.g. spot
+`s=1189718`, Pollença/Alcúdia). The raw station data is gated:
+- `https://www.windguru.cz/int/iapi.php?q=station_data_current&id_station={id}` → `401 Unauthorized` without a Windguru session/referer; with a referer it returns "Unknown station!" because the widget `s=` id ≠ the internal station id the data API wants.
+- No clean public `stations.windguru.cz/v1/...` per-id endpoint (404).
+So Windguru station widgets can be *embedded* (iframe) but their live numbers can't
+be put in our own UI without reverse-engineering their session. Use Holfuy/OceanDrivers
+(own APIs) for these spots instead. See docs/WIND-STATIONS-RESEARCH.md.
+
 ---
 
 ## Future (Phase 2+)

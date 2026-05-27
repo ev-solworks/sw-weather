@@ -11,12 +11,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { WindHistoryPoint } from '@/types/weather';
 import {
-  fetchLiveAll,
+  applyOrder,
+  fetchLiveDirect,
   fetchStationHistory,
   fetchStationRegistry,
   fmtSpeed,
   splitSpeed,
   loadWindUnit,
+  saveOrder,
   saveWindUnit,
   toUnit,
   unitLabel,
@@ -37,16 +39,31 @@ export function WindView() {
   const [error, setError] = useState<string | null>(null);
   const [unit, setUnit] = useState<WindUnit>(loadWindUnit);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
 
-  // Load registry once.
+  // Load registry once, applying the user's saved order.
   useEffect(() => {
     let alive = true;
     fetchStationRegistry()
-      .then((r) => alive && setRegistry(r))
+      .then((r) => alive && setRegistry(applyOrder(r)))
       .catch((e) => alive && setError(e instanceof Error ? e.message : 'failed'));
     return () => {
       alive = false;
     };
+  }, []);
+
+  // Move a card up/down in edit mode; persist the new order.
+  const move = useCallback((id: string, dir: -1 | 1) => {
+    setRegistry((prev) => {
+      if (!prev) return prev;
+      const i = prev.findIndex((m) => m.id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      saveOrder(next.map((m) => m.id));
+      return next;
+    });
   }, []);
 
   // Poll live readings direct from source, real-time. Pause when tab hidden.
@@ -59,10 +76,15 @@ export function WindView() {
         timer = setTimeout(tick, LIVE_POLL_MS);
         return;
       }
-      const r = await fetchLiveAll(registry);
-      if (!alive) return;
-      setReadings(r);
-      timer = setTimeout(tick, LIVE_POLL_MS);
+      // Fire all in parallel but apply each as it lands → grid fills progressively,
+      // fast stations don't wait on slow ones.
+      await Promise.all(
+        registry.map(async (m) => {
+          const reading = await fetchLiveDirect(m);
+          if (alive) setReadings((prev) => ({ ...prev, [m.id]: reading }));
+        }),
+      );
+      if (alive) timer = setTimeout(tick, LIVE_POLL_MS);
     };
     void tick();
     return () => {
@@ -88,8 +110,16 @@ export function WindView() {
         </div>
         <UnitToggle unit={unit} onChange={setUnitPersist} />
       </div>
-      <div className="px-4 pb-2 text-[12px] text-neutral-500">
-        Bay of Palma · {registry?.length ?? '…'} stations · measured
+      <div className="flex items-center justify-between px-4 pb-2">
+        <span className="text-[12px] text-neutral-500">Bay of Palma · {registry?.length ?? '…'} stations · measured</span>
+        {registry && registry.length > 1 && (
+          <button
+            onClick={() => setEditing((e) => !e)}
+            className={`font-mono text-[11px] font-semibold ${editing ? 'text-emerald-400' : 'text-neutral-500'}`}
+          >
+            {editing ? 'Done' : 'Edit'}
+          </button>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
@@ -97,8 +127,18 @@ export function WindView() {
         {!registry && !error && <Centered>Loading stations…</Centered>}
         {registry && (
           <div className="grid grid-cols-2 gap-2.5">
-            {registry.map((m) => (
-              <StationCard key={m.id} meta={m} reading={readings[m.id] ?? null} unit={unit} onOpen={() => setOpenId(m.id)} />
+            {registry.map((m, i) => (
+              <StationCard
+                key={m.id}
+                meta={m}
+                reading={readings[m.id] ?? null}
+                unit={unit}
+                onOpen={() => setOpenId(m.id)}
+                editing={editing}
+                canUp={i > 0}
+                canDown={i < registry.length - 1}
+                onMove={(dir) => move(m.id, dir)}
+              />
             ))}
           </div>
         )}
@@ -148,18 +188,30 @@ function UnitToggle({ unit, onChange }: { unit: WindUnit; onChange: (u: WindUnit
   );
 }
 
-function StationCard({ meta, reading, unit, onOpen }: { meta: StationMeta; reading: StationReading | null; unit: WindUnit; onOpen: () => void }) {
+function StationCard({
+  meta, reading, unit, onOpen, editing, canUp, canDown, onMove,
+}: {
+  meta: StationMeta; reading: StationReading | null; unit: WindUnit; onOpen: () => void;
+  editing: boolean; canUp: boolean; canDown: boolean; onMove: (dir: -1 | 1) => void;
+}) {
   const online = !!reading?.online;
   const loading = reading === null;
   const col = online ? windColor(reading!.windKt) : '#5a6480';
   return (
     <button
-      onClick={onOpen}
-      className={`relative flex flex-col items-center rounded-2xl border border-[#1b2440] px-2.5 pb-2.5 pt-3.5 text-left transition-transform active:scale-[.98] ${
-        online || loading ? '' : 'opacity-50'
-      }`}
+      onClick={() => !editing && onOpen()}
+      className={`relative flex flex-col items-center rounded-2xl border px-2.5 pb-2.5 pt-3.5 text-left transition-transform active:scale-[.98] ${
+        editing ? 'border-emerald-500/30' : 'border-[#1b2440]'
+      } ${online || loading ? '' : 'opacity-50'}`}
       style={{ background: 'radial-gradient(130% 110% at 50% -10%, #13213c 0%, #0c1428 68%)' }}
     >
+      {editing && (
+        <div className="absolute inset-0 z-10 flex items-center justify-between rounded-2xl bg-[#0a0f1c]/70 px-3 backdrop-blur-[1px]">
+          <MoveBtn dir={-1} disabled={!canUp} onClick={(e) => { e.stopPropagation(); onMove(-1); }} />
+          <span className="font-mono text-[11px] font-semibold text-neutral-300">{meta.name}</span>
+          <MoveBtn dir={1} disabled={!canDown} onClick={(e) => { e.stopPropagation(); onMove(1); }} />
+        </div>
+      )}
       <div className="text-center text-[12.5px] font-semibold tracking-tight text-neutral-50">{meta.name}</div>
       <div className="mt-0.5 font-mono text-[8.5px] uppercase tracking-wide text-neutral-600">{meta.place}</div>
 
@@ -279,6 +331,23 @@ function StationDetail({ meta, reading, unit, onClose }: { meta: StationMeta | n
         </div>
       </div>
     </div>
+  );
+}
+
+function MoveBtn({ dir, disabled, onClick }: { dir: -1 | 1; disabled: boolean; onClick: (e: React.MouseEvent) => void }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={dir === -1 ? 'Move earlier' : 'Move later'}
+      className={`flex h-9 w-9 items-center justify-center rounded-full border ${
+        disabled ? 'border-[#1b2440] text-neutral-700' : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400 active:scale-90'
+      }`}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {dir === -1 ? <path d="M15 18l-6-6 6-6" /> : <path d="M9 18l6-6-6-6" />}
+      </svg>
+    </button>
   );
 }
 

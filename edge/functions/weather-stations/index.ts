@@ -37,7 +37,17 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const stationId = url.searchParams.get('station');
     const wantHistory = url.searchParams.has('history');
+    const metaOnly = url.searchParams.has('meta');
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+    // Fast path: registry metadata only (no upstream fetches). The client polls
+    // live readings directly from the source for real-time, so it doesn't need
+    // the proxy to fetch live here — this is a sub-100ms DB read.
+    if (metaOnly) {
+      const { data: stations } = await supabase
+        .from('weather_stations').select('*').eq('active', true).order('sort').returns<StationRow[]>();
+      return json({ stations: stations ?? [], at: new Date().toISOString() });
+    }
 
     // Helper: read a station's cached `kind`, refetch if missing/stale, return payload.
     async function cached(st: StationRow, kind: 'live' | 'history', ttl: number): Promise<unknown> {
