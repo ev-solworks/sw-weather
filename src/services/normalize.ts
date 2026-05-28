@@ -15,6 +15,7 @@
 
 import type {
   Confidence,
+  ConditionCode,
   CurrentConditions,
   DayForecast,
   FieldProvenance,
@@ -355,7 +356,29 @@ function aemetHourlyToHours(
       });
     }
   }
-  return hours.sort((a, b) => a.time.getTime() - b.time.getTime());
+  const sorted = hours.sort((a, b) => a.time.getTime() - b.time.getTime());
+  return smoothIsolatedFog(sorted);
+}
+
+/**
+ * AEMET's automated model often forecasts an isolated `Niebla`/`Bruma` hour
+ * sandwiched between clear hours (atmospherically implausible — fog doesn't form
+ * and dissipate inside a single hour while the sky is clear on either side).
+ * If a single Fog/Haze hour sits between two CLEAR/Mostly-clear/Sunny hours,
+ * demote it to the surrounding condition. Multi-hour fog blocks are left alone.
+ */
+function smoothIsolatedFog(hs: HourForecast[]): HourForecast[] {
+  const clear = new Set<ConditionCode>(['Clear', 'Mostly clear', 'Sunny', 'Mostly sunny']);
+  const muddy = new Set<ConditionCode>(['Fog', 'Haze']);
+  for (let i = 1; i < hs.length - 1; i++) {
+    const prev = hs[i - 1].description;
+    const cur = hs[i].description;
+    const next = hs[i + 1].description;
+    if (muddy.has(cur) && clear.has(prev) && clear.has(next)) {
+      hs[i] = { ...hs[i], description: prev };
+    }
+  }
+  return hs;
 }
 
 function aemetDailyToDays(root: Awaited<ReturnType<typeof aemet.fetchDaily>>, timezone: string): DayForecast[] {

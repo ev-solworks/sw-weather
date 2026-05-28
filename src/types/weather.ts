@@ -82,6 +82,7 @@ export type ConditionCode =
   | 'Thunder'
   | 'Snow'
   | 'Fog'
+  | 'Haze'
   | 'Sunny'
   | 'Mostly sunny';
 

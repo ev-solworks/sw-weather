@@ -72,7 +72,8 @@ export function aemetSkyToCondition(code: string): ConditionCode {
     case 16:
       return 'Cloudy';
   }
-  if (n === 81 || n === 82 || n === 83) return 'Fog'; // niebla / bruma / calima
+  if (n === 81) return 'Fog'; // niebla — true ground fog
+  if (n === 82 || n === 83) return 'Haze'; // bruma (mist) / calima (Sahara dust) — sky often still bright
   if ((n >= 51 && n <= 54) || (n >= 61 && n <= 64)) return 'Thunder';
   if ((n >= 33 && n <= 36) || (n >= 71 && n <= 74)) return 'Snow';
   if (n === 25 || n === 26) return 'Heavy rain'; // muy nuboso/cubierto + lluvia

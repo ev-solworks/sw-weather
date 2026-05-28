@@ -74,6 +74,22 @@ export function WxIcon({ desc, size = 24, color = 'currentColor', strokeWidth = 
         </svg>
       );
 
+    case 'Haze':
+      // Sun (or moon) with two hazy horizontal bands across — bright sky with suspended dust/mist.
+      return (
+        <svg {...common}>
+          {night ? (
+            <path d="M19 14A6 6 0 1110 5a5 5 0 009 9z" />
+          ) : (
+            <>
+              <circle cx="12" cy="10" r="3.5" />
+              <path d="M12 3v1.5M12 15.5V17M3.5 10H5M19 10h1.5M5.6 3.6l1 1M17.4 16.4l1 1M5.6 16.4l1-1M17.4 3.6l1-1" />
+            </>
+          )}
+          <path d="M3 19h6M11 19h4M17 19h4M5 21.5h5M12 21.5h4M18 21.5h3" opacity={0.55} />
+        </svg>
+      );
+
     case 'Light rain':
       return (
         <svg {...common}>

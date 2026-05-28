@@ -23,6 +23,8 @@ const CONDITION_PALETTE: Record<ConditionCode, Palette> = {
   'Partly cloudy': { from: '#2a3650', via: '#1c2438', to: '#0a0f1c' },
   Cloudy: { from: '#2c3340', via: '#1e2430', to: '#0a0f1c' },
   Fog: { from: '#363b42', via: '#262a30', to: '#0e1216' },
+  // Haze: bruma/calima — bright but milky/dusty sky. Warm amber lift, not grey fog.
+  Haze: { from: '#3a3a52', via: '#2a2848', to: '#0e1018' },
   'Light rain': { from: '#243648', via: '#1a2735', to: '#0a0f18' },
   Rain: { from: '#1e2e3e', via: '#16222e', to: '#080d14' },
   'Heavy rain': { from: '#1a2530', via: '#121a24', to: '#070b11' },
