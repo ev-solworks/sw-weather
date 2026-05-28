@@ -15,7 +15,7 @@ import { LocationSwitcher } from '@/components/LocationSwitcher';
 
 const SUB_VIEWS: { key: TodaySubView; label: string; enabled: boolean }[] = [
   { key: 'visual', label: 'Visual', enabled: true },
-  { key: 'windguru', label: 'Windguru', enabled: true },
+  { key: 'windguru', label: 'Detail', enabled: true },
   { key: 'graph', label: 'Graph', enabled: true },
   { key: 'sun', label: 'Sun', enabled: true },
 ];

@@ -10,20 +10,22 @@ export interface CellColor {
   fg: string;
 }
 
+/**
+ * Wind ramp in km/h. Tuned softer than the first cut, closer to Windguru: low
+ * chroma at calm/mid (so the table doesn't look like a wall of fluorescence on
+ * a normal day), saturation reserved for strong winds where it actually warns.
+ */
 export function windScale(v: number): CellColor {
-  if (v < 4) return { bg: '#141414', fg: '#5a5a55' };
-  if (v < 7) return { bg: '#bff0ee', fg: '#0a3a3a' };
-  if (v < 10) return { bg: '#7fe2d6', fg: '#0a2a2a' };
-  if (v < 13) return { bg: '#2fd49a', fg: '#0a2614' };
-  if (v < 16) return { bg: '#26c25c', fg: '#0a2614' };
-  if (v < 19) return { bg: '#7fd02a', fg: '#1a2606' };
-  if (v < 22) return { bg: '#cad42a', fg: '#26260a' };
-  if (v < 25) return { bg: '#f0c020', fg: '#2a1a04' };
-  if (v < 28) return { bg: '#f49224', fg: '#2a0e02' };
-  if (v < 31) return { bg: '#ee5b2a', fg: '#fff' };
-  if (v < 35) return { bg: '#e8332f', fg: '#fff' };
-  if (v < 40) return { bg: '#cf3290', fg: '#fff' };
-  return { bg: '#8a3fcc', fg: '#fff' };
+  if (v < 5) return { bg: '#1a2030', fg: '#6a7388' };   // calm — barely tinted
+  if (v < 10) return { bg: '#1f3a4d', fg: '#9ccae0' };  // light air
+  if (v < 15) return { bg: '#214a4a', fg: '#a8e0c8' };  // gentle
+  if (v < 20) return { bg: '#1f5a3a', fg: '#b8e8b0' };  // moderate
+  if (v < 25) return { bg: '#3a6020', fg: '#d8e89c' };  // fresh
+  if (v < 30) return { bg: '#6a5e1a', fg: '#f0d878' };  // strong (planing range)
+  if (v < 38) return { bg: '#8a4a1a', fg: '#fbb96a' };  // very strong
+  if (v < 48) return { bg: '#a8331e', fg: '#ffdcb0' };  // near gale
+  if (v < 60) return { bg: '#a4205a', fg: '#ffd6e0' };  // gale
+  return { bg: '#6a2899', fg: '#ffd0ff' };               // storm
 }
 
 export function tempScale(v: number): CellColor {

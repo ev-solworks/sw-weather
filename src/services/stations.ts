@@ -158,6 +158,20 @@ export function splitSpeed(kt: number, unit: WindUnit): { int: string; dec: stri
 }
 export const unitLabel = (u: WindUnit): string => (u === 'kt' ? 'KN' : 'KM/H');
 
+// ── temperature unit (persisted) ──────────────────────────────────────────────
+export type TempUnit = 'c' | 'f';
+const TEMP_KEY = 'sw.weather.tempUnit';
+export function loadTempUnit(): TempUnit {
+  try { return globalThis.localStorage?.getItem(TEMP_KEY) === 'f' ? 'f' : 'c'; } catch { return 'c'; }
+}
+export function saveTempUnit(u: TempUnit): void {
+  try { globalThis.localStorage?.setItem(TEMP_KEY, u); } catch { /* ignore */ }
+}
+export function toTemp(c: number, u: TempUnit): number {
+  return u === 'c' ? Math.round(c) : Math.round(c * 9 / 5 + 32);
+}
+export const tempUnitLabel = (u: TempUnit): string => (u === 'c' ? '°C' : '°F');
+
 // ── station order (user-reorderable, persisted) ──────────────────────────────
 const ORDER_KEY = 'sw.weather.stationOrder';
 
