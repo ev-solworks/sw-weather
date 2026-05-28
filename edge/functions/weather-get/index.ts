@@ -44,12 +44,45 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    const { data: loc, error: locErr } = await supabase
+    let { data: loc, error: locErr } = await supabase
       .from('weather_locations')
       .select('*')
       .eq('id', locationId)
       .single<LocationRow>();
-    if (locErr || !loc) return json({ error: 'unknown location' }, 404);
+
+    // Auto-register a user-added location when the row doesn't exist yet but
+    // the client passed enough metadata. The cron then picks it up next tick.
+    if ((locErr || !loc)) {
+      const url = new URL(req.url);
+      const lat = Number(url.searchParams.get('lat'));
+      const lon = Number(url.searchParams.get('lon'));
+      const country = url.searchParams.get('country');
+      const name = url.searchParams.get('name');
+      const tz = url.searchParams.get('tz');
+      const region = url.searchParams.get('region') ?? name ?? '';
+      if (Number.isFinite(lat) && Number.isFinite(lon) && (country === 'ES' || country === 'PT') && name && tz) {
+        const candidate: LocationRow = {
+          id: locationId,
+          country: country as 'ES' | 'PT',
+          lat, lon, timezone: tz,
+          aemet_municipio: null, aemet_station: null,
+          ipma_global_id_local: null, oceandrivers_station: null,
+          is_coastal: false,
+        };
+        const { error: insErr } = await supabase.from('weather_locations').insert({
+          id: locationId, name, region,
+          country, lat, lon, timezone: tz,
+          aemet_municipio: null, aemet_station: null,
+          ipma_global_id_local: null, oceandrivers_station: null,
+          is_coastal: false,
+        });
+        if (insErr) return json({ error: `register failed: ${insErr.message}` }, 500);
+        loc = candidate;
+        locErr = null;
+      } else {
+        return json({ error: 'unknown location' }, 404);
+      }
+    }
 
     const { data: rows } = await supabase
       .from('weather_cache')

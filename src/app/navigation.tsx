@@ -13,9 +13,11 @@ import type { Location } from '@/types/weather';
 import { SEED_LOCATIONS } from '@/utils/locations';
 
 export type Tab = 'home' | 'today' | 'week' | 'map' | 'more';
-export type TodaySubView = 'visual' | 'windguru' | 'graph' | 'sun';
+export type TodaySubView = 'visual' | 'windguru' | 'graph' | 'sun' | 'map';
 
 const LOCATIONS_KEY = 'sw.weather.locations';
+const ACTIVE_KEY = 'sw.weather.activeLocationId';
+const TAB_KEY = 'sw.weather.lastTab';
 
 interface NavState {
   tab: Tab;
@@ -56,11 +58,42 @@ function persist(locations: Location[]): void {
   }
 }
 
+function loadLastActiveId(seed: Location[]): string {
+  try {
+    const stored = globalThis.localStorage?.getItem(ACTIVE_KEY);
+    if (stored && seed.some((l) => l.id === stored)) return stored;
+  } catch { /* ignore */ }
+  return seed[0]?.id ?? '';
+}
+
+function loadLastTab(): Tab {
+  // Open on Today by default. Reading from storage lets a returning user land
+  // on whatever they last looked at (matches how Apple Weather / eltiempo behave).
+  try {
+    const stored = globalThis.localStorage?.getItem(TAB_KEY);
+    if (stored === 'home' || stored === 'today' || stored === 'week' || stored === 'map' || stored === 'more') {
+      return stored;
+    }
+  } catch { /* ignore */ }
+  return 'today';
+}
+
 export function NavProvider({ children }: { children: ReactNode }) {
-  const [tab, setTab] = useState<Tab>('home');
+  const initialLocations = loadLocations();
+  const [tab, setTabState] = useState<Tab>(loadLastTab);
   const [todaySub, setTodaySub] = useState<TodaySubView>('visual');
-  const [locations, setLocations] = useState<Location[]>(loadLocations);
-  const [activeLocationId, setActiveLocationId] = useState<string>(() => loadLocations()[0]?.id ?? '');
+  const [locations, setLocations] = useState<Location[]>(initialLocations);
+  const [activeLocationId, setActiveLocationIdState] = useState<string>(() => loadLastActiveId(initialLocations));
+
+  // Persist tab + active location so the next boot lands on what the user last used.
+  const setTab = useCallback((t: Tab) => {
+    setTabState(t);
+    try { globalThis.localStorage?.setItem(TAB_KEY, t); } catch { /* ignore */ }
+  }, []);
+  const setActiveLocationId = useCallback((id: string) => {
+    setActiveLocationIdState(id);
+    try { globalThis.localStorage?.setItem(ACTIVE_KEY, id); } catch { /* ignore */ }
+  }, []);
 
   const activeLocation = useMemo(
     () => locations.find((l) => l.id === activeLocationId) ?? locations[0],
@@ -90,7 +123,14 @@ export function NavProvider({ children }: { children: ReactNode }) {
       persist(next);
       return next;
     });
-    setActiveLocationId((cur) => (cur === id ? (locations[0]?.id ?? '') : cur));
+    // Use the functional form of the raw setter so we read the latest
+    // activeId without taking it as a stale dep.
+    setActiveLocationIdState((cur) => {
+      if (cur !== id) return cur;
+      const next = locations.find((l) => l.id !== id)?.id ?? '';
+      try { globalThis.localStorage?.setItem(ACTIVE_KEY, next); } catch { /* ignore */ }
+      return next;
+    });
   }, [locations]);
 
   const value: NavState = {

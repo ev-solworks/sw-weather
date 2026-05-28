@@ -78,11 +78,29 @@ export function proxyConfigured(): boolean {
   return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 }
 
-/** Fetch the cached raw payloads for a location from the edge proxy. */
-export async function fetchFromProxy(locationId: string): Promise<ProxyResponse> {
+/**
+ * Fetch the cached raw payloads for a location from the edge proxy.
+ *
+ * For user-added locations (not in the seed `weather_locations` table), pass
+ * `register` so the edge can auto-create the row on first call. The next cron
+ * tick then prefetches it like any seeded location.
+ */
+export async function fetchFromProxy(
+  locationId: string,
+  register?: { name: string; region: string; country: 'ES' | 'PT'; lat: number; lon: number; timezone: string },
+): Promise<ProxyResponse> {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new ProxyError('proxy not configured');
-  const url = `${SUPABASE_URL}/functions/v1/weather-get?locationId=${encodeURIComponent(locationId)}`;
-  const res = await fetch(url, {
+  const url = new URL(`${SUPABASE_URL}/functions/v1/weather-get`);
+  url.searchParams.set('locationId', locationId);
+  if (register) {
+    url.searchParams.set('name', register.name);
+    url.searchParams.set('region', register.region);
+    url.searchParams.set('country', register.country);
+    url.searchParams.set('lat', String(register.lat));
+    url.searchParams.set('lon', String(register.lon));
+    url.searchParams.set('tz', register.timezone);
+  }
+  const res = await fetch(url.toString(), {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
     signal: AbortSignal.timeout(15_000),
   });

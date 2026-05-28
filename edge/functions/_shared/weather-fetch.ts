@@ -117,6 +117,9 @@ const OM_AQ = 'https://air-quality-api.open-meteo.com/v1/air-quality';
 
 const OM_HOURLY = 'temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,precipitation_probability,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,is_day';
 const OM_DAILY = 'temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,uv_index_max,sunrise,sunset';
+// 15-min precip nowcast (Open-Meteo `minutely_15`). 1h ahead is enough for the
+// "rain in N min" banner; longer windows aren't more accurate at this resolution.
+const OM_MINUTELY = 'precipitation,rain';
 
 async function omFetch(host: string, params: Record<string, string | number>): Promise<unknown> {
   const qs = new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]));
@@ -125,7 +128,7 @@ async function omFetch(host: string, params: Record<string, string | number>): P
   return res.json();
 }
 export function omForecast(lat: number, lon: number, tz: string) {
-  return omFetch(OM_FORECAST, { latitude: lat, longitude: lon, timezone: tz, hourly: OM_HOURLY, daily: OM_DAILY, forecast_days: 7 });
+  return omFetch(OM_FORECAST, { latitude: lat, longitude: lon, timezone: tz, hourly: OM_HOURLY, daily: OM_DAILY, minutely_15: OM_MINUTELY, forecast_minutely_15: 16, forecast_days: 7 });
 }
 export function omMarine(lat: number, lon: number, tz: string) {
   return omFetch(OM_MARINE, { latitude: lat, longitude: lon, timezone: tz, hourly: 'wave_height,wave_direction,wave_period,sea_surface_temperature' });
@@ -152,6 +155,25 @@ export async function oceanDriversHistory(stationId: string): Promise<unknown> {
   };
   const [hour, day] = await Promise.all([get('latesthour'), get('latestday')]);
   return { hour, day };
+}
+
+// ── Multi-model Open-Meteo (for forecast_archive scoring) ────────────────────
+// One request returns all models inline as `temperature_2m_icon_eu`, etc.
+const OM_MODELS = 'best_match,dwd_icon_eu,meteofrance_arome_france,ecmwf_ifs025,gfs_seamless';
+const OM_MULTI_HOURLY = 'temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,precipitation_probability,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m';
+
+export interface OmMultiHourly {
+  time: string[];
+  // each variable suffixed by `_<model>` when models param set, e.g. temperature_2m_icon_eu
+  [k: string]: string[] | number[];
+}
+export interface OmMultiForecast { hourly: OmMultiHourly }
+
+export async function omForecastMulti(lat: number, lon: number, tz: string): Promise<OmMultiForecast> {
+  return omFetch(OM_FORECAST, {
+    latitude: lat, longitude: lon, timezone: tz,
+    hourly: OM_MULTI_HOURLY, models: OM_MODELS, forecast_days: 3,
+  }) as Promise<OmMultiForecast>;
 }
 
 function haversine(la1: number, lo1: number, la2: number, lo2: number): number {
@@ -186,6 +208,10 @@ export async function fetchAllForLocation(
     run('aemet-daily', aemetDaily(loc.aemet_municipio, aemetKey));
     if (loc.aemet_station) run('aemet-obs', aemetObs(loc.aemet_station, aemetKey));
     if (loc.is_coastal) run('om-marine', omMarine(loc.lat, loc.lon, loc.timezone));
+    // AEMET hourly has no per-hour UV (only daily uvMax) and no cloud_cover %.
+    // Pull OM forecast to fill those fields without replacing AEMET's MOS-
+    // corrected temp/wind/precip/sky.
+    run('om-forecast', omForecast(loc.lat, loc.lon, loc.timezone));
     run('om-aq', omAirQuality(loc.lat, loc.lon, loc.timezone));
   } else if (loc.country === 'PT' && loc.ipma_global_id_local) {
     run('ipma-daily', ipmaDaily(loc.ipma_global_id_local));
