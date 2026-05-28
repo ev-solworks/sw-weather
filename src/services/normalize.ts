@@ -718,7 +718,10 @@ async function assemble(loc: Location): Promise<WeatherConditions> {
     name: loc.name, region: loc.region, country: loc.country,
     lat: loc.lat, lon: loc.lon, timezone: loc.timezone,
   });
-  return loc.country === 'ES' ? normalizeSpain(loc, payloads) : normalizePortugal(loc, payloads);
+  // ES + PT have national-service primaries; anywhere else falls back to OM.
+  if (loc.country === 'ES') return normalizeSpain(loc, payloads);
+  if (loc.country === 'PT') return normalizePortugal(loc, payloads);
+  return normalizeOpenMeteoFallback(loc, payloads);
 }
 
 /**

@@ -23,7 +23,6 @@ import { WxIcon } from '@/components/WxIcon';
 import { MetricDetail, type MetricKey } from '@/components/MetricDetail';
 import { RainNowcastBanner } from '@/components/RainNowcastBanner';
 import { AnnotationStrip } from '@/components/AnnotationStrip';
-import { HistoryChip } from '@/components/HistoryChip';
 import { atmPalette } from '@/components/WeatherBackdrop';
 import { compass, fmtDuration, fmtTime, localHour, uvLabel } from '@/utils/format';
 
@@ -70,8 +69,10 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
 
   return (
     <div className="flex w-full flex-col" style={{ color: fg, textShadow }}>
-      {/* Minute-by-minute rain nowcast — only renders when precip in next 60 min. */}
+      {/* Top warnings stack: minutely rain banner + critical annotations
+          (severe weather, peak gust). Sits above the hero, after the tab bar. */}
       <RainNowcastBanner nowcast={weather.rainNowcast} />
+      <AnnotationStrip weather={weather} limit={2} />
 
       {/* ── Top bar ────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-4 pb-2 pt-2">
@@ -174,12 +175,8 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
         </div>
       </div>
 
-      {/* ── Annotation row ─────────────────────────────────────── */}
-      <Hair mt={6} />
-      <AnnotationStrip weather={weather} />
-
       {/* ── 3 metric columns — no cards, hairlines above/below ── */}
-      <Hair mt={0} />
+      <Hair mt={10} />
       <div className="grid grid-cols-3 px-0 py-3">
         <MetricCol fg={fg} fgLo={fgLo} fgXLo={fgXLo} label="Wind" value={`${current.windSpeed}`} unit={`km/h ${compass(current.windDirection)}`} live={weather.sources.wind?.source === 'oceandrivers'} align="flex-start" pad={18} onTap={() => setDetailMetric('wind')} />
         <MetricCol fg={fg} fgLo={fgLo} fgXLo={fgXLo} label="Humidity" value={`${current.humidity}`} unit="%" align="center" onTap={() => setDetailMetric('humidity')} />
@@ -189,10 +186,6 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
       {/* ── Daylight arc — no card, hairline above ─────────────── */}
       <Hair />
       <SunArc sunrise={sun.sunrise} sunset={sun.sunset} tz={tz} nowMs={nowMs} fg={fg} fgLo={fgLo} fgXLo={fgXLo} fgXXLo={fgXXLo} />
-
-      {/* ── History row — no card, hairline above ──────────────── */}
-      <Hair mt={10} />
-      <HistoryChip weather={weather} />
 
       {/* Bottom safe-area spacer so the last row clears the tab bar */}
       <div style={{ height: 24 }} />

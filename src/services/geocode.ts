@@ -33,7 +33,7 @@ interface OmGeocodeResponse {
   results?: OmGeocodeResult[];
 }
 
-/** Search by free-text query. Restricted to ES + PT. Returns max 10 hits. */
+/** Search by free-text query. Global — any country. Returns max 10 hits. */
 export async function searchPlaces(query: string): Promise<Location[]> {
   const q = query.trim();
   if (q.length < 2) return [];
@@ -45,9 +45,7 @@ export async function searchPlaces(query: string): Promise<Location[]> {
   const res = await fetch(url.toString(), { signal: AbortSignal.timeout(8_000) });
   if (!res.ok) throw new Error(`geocode ${res.status}`);
   const body = (await res.json()) as OmGeocodeResponse;
-  return (body.results ?? [])
-    .filter((r) => r.country_code === 'ES' || r.country_code === 'PT')
-    .map(toLocation);
+  return (body.results ?? []).map(toLocation);
 }
 
 /** Reverse-geocode (browser geolocation → nearest known place). */
@@ -65,32 +63,42 @@ export async function reverseGeocode(lat: number, lon: number): Promise<Location
     city?: string; locality?: string; principalSubdivision?: string;
     countryCode?: string; countryName?: string;
   };
-  const code = body.countryCode;
-  if (code !== 'ES' && code !== 'PT') return null;
+  const code = body.countryCode ?? 'XX';
   const name = body.city || body.locality || 'Current location';
-  // Reverse-geocode doesn't return IANA TZ — derive from country + lon.
-  const tz = inferTimezone(code as CountryCode, lat, lon);
+  // Reverse-geocode doesn't return IANA TZ — derive from coords (best effort).
+  const tz = inferTimezone(code, lat, lon);
   return {
     id: slugForCoord(name, lat, lon),
     name,
     region: body.principalSubdivision ?? body.countryName ?? '',
-    country: code as CountryCode,
+    country: code,
     lat,
     lon,
     timezone: tz,
   };
 }
 
-/** Best-effort IANA timezone from country + coordinates (matches CLAUDE.md table). */
+/**
+ * Best-effort IANA timezone from country + coordinates.
+ * ES / PT get the precise mappings; everywhere else uses the device's TZ
+ * (`Intl.DateTimeFormat().resolvedOptions().timeZone`) since 'use my location'
+ * almost always means the user IS in that zone.
+ */
 function inferTimezone(country: CountryCode, lat: number, lon: number): string {
   if (country === 'PT') {
-    if (lat < 35 && lon > -20) return 'Atlantic/Madeira'; // Madeira archipelago
-    if (lat > 35 && lat < 41 && lon < -20) return 'Atlantic/Azores'; // Azores
+    if (lat < 35 && lon > -20) return 'Atlantic/Madeira';
+    if (lat > 35 && lat < 41 && lon < -20) return 'Atlantic/Azores';
     return 'Europe/Lisbon';
   }
-  // ES
-  if (lat < 30 && lat > 25 && lon < -10) return 'Atlantic/Canary'; // Canary Islands
-  return 'Europe/Madrid';
+  if (country === 'ES') {
+    if (lat < 30 && lat > 25 && lon < -10) return 'Atlantic/Canary';
+    return 'Europe/Madrid';
+  }
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
 }
 
 function toLocation(r: OmGeocodeResult): Location {

@@ -87,7 +87,7 @@ export function proxyConfigured(): boolean {
  */
 export async function fetchFromProxy(
   locationId: string,
-  register?: { name: string; region: string; country: 'ES' | 'PT'; lat: number; lon: number; timezone: string },
+  register?: { name: string; region: string; country: string; lat: number; lon: number; timezone: string },
 ): Promise<ProxyResponse> {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new ProxyError('proxy not configured');
   const url = new URL(`${SUPABASE_URL}/functions/v1/weather-get`);

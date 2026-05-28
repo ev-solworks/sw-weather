@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
       const name = url.searchParams.get('name');
       const tz = url.searchParams.get('tz');
       const region = url.searchParams.get('region') ?? name ?? '';
-      if (Number.isFinite(lat) && Number.isFinite(lon) && (country === 'ES' || country === 'PT') && name && tz) {
+      if (Number.isFinite(lat) && Number.isFinite(lon) && country && name && tz) {
         const candidate: LocationRow = {
           id: locationId,
           country: country as 'ES' | 'PT',

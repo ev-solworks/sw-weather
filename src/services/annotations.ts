@@ -1,51 +1,33 @@
 /**
- * annotations.ts — plain-language annotation rule engine.
+ * annotations.ts — top-banner warnings only.
  *
- * Surfaces useful at-a-glance cues from the forecast bundle. Hand-authored
- * rules, no LLM. Each rule examines WeatherConditions and emits zero or more
- * annotations, ordered by priority.
+ * Surfaces ONLY things that need attention RIGHT NOW. No general info chips,
+ * no temp-trend, no golden-hour reminders. The Visual hero is the answer to
+ * "what's the weather"; this engine is the answer to "what's about to go wrong".
  *
- * Output kinds:
- *   • `urgent`  — banner-worthy (severe wx)
- *   • `info`    — secondary chip beneath hero (peak gust, rain onset,
- *     golden-hour window, temp trend)
- *   • `compare` — historical / cross-window comparisons
- *
- * Render rules:
- *   • At most one `urgent`
- *   • Up to three `info`
- *   • One `compare`
- *
- * Production-specific cues (drone window, jib threshold, talent cover) live
- * elsewhere or have been removed — annotations stay neutral.
+ * Renders above the hero as banners (per-condition styling in AnnotationStrip).
  */
 
 import type { WeatherConditions, HourForecast, ConditionCode } from '@/types/weather';
 import { fmtTime } from '@/utils/format';
 
-export type AnnotationKind = 'urgent' | 'info' | 'compare';
+export type AnnotationKind = 'urgent' | 'info';
 
 export interface Annotation {
   id: string;
   kind: AnnotationKind;
   text: string;
-  /** Canonical ConditionCode for icon, or one of the synthetic 'wind' / 'sun' / 'thermo' / 'umbrella' tags. */
   icon?: ConditionCode | 'wind' | 'sun' | 'thermo' | 'umbrella';
-  /** Priority (higher = more important). Default 0. */
   priority?: number;
-  /** Optional time the annotation refers to (for graph positioning). */
   when?: Date;
 }
 
-/** Public API: get all annotations sorted by priority desc. */
 export function getAnnotations(weather: WeatherConditions): Annotation[] {
   const tz = weather.location.timezone;
   const all: Annotation[] = [];
   const next8 = nextHours(weather.hours, 8);
 
-  // ── Urgent ────────────────────────────────────────────────────────────────
-
-  // Severe weather alerts (from AEMET/IPMA).
+  // Severe weather warnings from AEMET / IPMA — always urgent.
   for (const a of weather.alerts) {
     all.push({
       id: `alert-${a.id}`,
@@ -56,22 +38,21 @@ export function getAnnotations(weather: WeatherConditions): Annotation[] {
     });
   }
 
-  // ── Info ─────────────────────────────────────────────────────────────────
-
-  // Peak gust within next 8h (any significant value).
+  // Dangerous gust within 8h.
   const peakGust = next8.reduce<HourForecast | null>((best, h) => (best && best.windGust >= h.windGust ? best : h), null);
-  if (peakGust && peakGust.windGust >= 30) {
+  if (peakGust && peakGust.windGust >= 50) {
     all.push({
       id: 'peak-gust',
-      kind: 'info',
+      kind: 'urgent',
       icon: 'wind',
-      text: `Gust ${Math.round(peakGust.windGust)} km/h at ${fmtTime(peakGust.time, tz)}`,
-      priority: peakGust.windGust >= 50 ? 75 : 55,
+      text: `Strong gust ${Math.round(peakGust.windGust)} km/h at ${fmtTime(peakGust.time, tz)}`,
+      priority: 50,
       when: peakGust.time,
     });
   }
 
-  // Rain onset within next 8h (and not already captured by the minutely banner).
+  // Rain onset (≥60% prob) within next 8h, only if the minutely banner isn't
+  // already covering it.
   if (!weather.rainNowcast?.slots.some((s) => s.mm > 0.05)) {
     const rainHr = next8.find((h) => h.precipProbability >= 60);
     if (rainHr) {
@@ -86,21 +67,8 @@ export function getAnnotations(weather: WeatherConditions): Annotation[] {
     }
   }
 
-  // ── Compare ──────────────────────────────────────────────────────────────
-
-  // Current vs day's max — "Still warming" / "Past peak" etc.
-  const today = weather.days.find((d) => d.dayName === 'Today');
-  if (today) {
-    const hereAndNow = weather.current.temperature;
-    const diff = today.tempHi - hereAndNow;
-    if (diff >= 3) all.push({ id: 'temp-warming', kind: 'compare', icon: 'thermo', text: `Still warming — high of ${today.tempHi}° expected`, priority: 10 });
-    else if (diff <= -1) all.push({ id: 'temp-cooling', kind: 'compare', icon: 'thermo', text: `Past day's peak — cooling toward low ${today.tempLo}°`, priority: 10 });
-  }
-
   return all.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function nextHours(hours: HourForecast[], n: number): HourForecast[] {
   const now = Date.now();
@@ -108,4 +76,3 @@ function nextHours(hours: HourForecast[], n: number): HourForecast[] {
   if (idx < 0) return [];
   return hours.slice(idx, idx + n);
 }
-

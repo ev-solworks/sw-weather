@@ -2,7 +2,7 @@
  * Location switcher — bottom-sheet list of saved locations + search/add + "use
  * my location". Opened from the location pill in Today views.
  *
- * Search uses Open-Meteo geocoding (keyless, ES/PT filter applied client-side).
+ * Search uses Open-Meteo geocoding (keyless, global coverage).
  * Geolocate uses navigator.geolocation + BigDataCloud reverse-geocode (keyless).
  * New locations are added to nav context (localStorage-persisted) and trigger
  * an edge-side row creation on first weather fetch.
@@ -108,7 +108,7 @@ export function LocationSwitcher({ open, onClose }: { open: boolean; onClose: ()
           {query.trim() && (
             <div className="px-2 py-2">
               <div className="px-2 pb-1 font-mono text-[10px] tracking-wider text-neutral-500">
-                {searching ? 'SEARCHING…' : results.length ? 'RESULTS' : 'NO MATCH (ES/PT only)'}
+                {searching ? 'SEARCHING…' : results.length ? 'RESULTS' : 'NO MATCH'}
               </div>
               <ul>
                 {results.map((r) => (

@@ -234,7 +234,11 @@ export interface WeatherAlert {
 // Location
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type CountryCode = 'ES' | 'PT';
+/**
+ * ISO 3166-1 alpha-2 country code. 'ES' / 'PT' get the national-service
+ * primaries (AEMET / IPMA); any other code falls back to Open-Meteo only.
+ */
+export type CountryCode = string;
 
 /**
  * A place the app shows weather for. Carries the source-routing IDs so the

@@ -213,6 +213,11 @@ export async function fetchAllForLocation(
     // corrected temp/wind/precip/sky.
     run('om-forecast', omForecast(loc.lat, loc.lon, loc.timezone));
     run('om-aq', omAirQuality(loc.lat, loc.lon, loc.timezone));
+  } else if (loc.country !== 'PT' && loc.country !== 'ES') {
+    // Generic country (user-added anywhere in the world) — OM only.
+    run('om-forecast', omForecast(loc.lat, loc.lon, loc.timezone));
+    if (loc.is_coastal) run('om-marine', omMarine(loc.lat, loc.lon, loc.timezone));
+    run('om-aq', omAirQuality(loc.lat, loc.lon, loc.timezone));
   } else if (loc.country === 'PT' && loc.ipma_global_id_local) {
     run('ipma-daily', ipmaDaily(loc.ipma_global_id_local));
     run('om-forecast', omForecast(loc.lat, loc.lon, loc.timezone)); // PT hourly from OM
