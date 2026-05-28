@@ -80,7 +80,8 @@ export function TabBar() {
   const { tab, setTab } = useNav();
   return (
     <nav
-      className="flex shrink-0 items-stretch border-t border-[#1a2533] bg-[#0a0f1c] pb-2"
+      className="flex shrink-0 items-stretch border-t border-[#1a2533] bg-[#0a0f1c]"
+      style={{ paddingBottom: `calc(env(safe-area-inset-bottom, 0px) + 8px)` }}
       aria-label="Primary"
     >
       {TABS.map((t) => {

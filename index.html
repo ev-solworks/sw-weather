@@ -3,17 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <!-- Lock zoom: PWA-like behavior. user-scalable=no disables pinch-zoom +
-         iOS Safari's auto-zoom on text-input focus. NO viewport-fit=cover —
-         we don't render content under the home indicator and that just steals
-         pixels for the safe-area inset on every fixed-bottom UI. -->
+    <!-- viewport-fit=cover lets the sky extend under the iOS status bar +
+         home indicator. We handle safe-area-insets in CSS so content doesn't
+         sit under the notch.
+         user-scalable=no disables pinch-zoom + Safari's auto-zoom on inputs. -->
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no"
+      content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover"
     />
-    <!-- theme-color tuned to the sky's mid-band so iOS Safari's status bar
-         blends into the atmospheric backdrop. -->
+    <!-- theme-color is the iOS Safari status bar fill BEFORE the PWA is
+         installed. After install, apple-mobile-web-app-status-bar-style takes
+         over — black-translucent makes the status bar transparent so our sky
+         shows through. -->
     <meta name="theme-color" content="#1a1f30" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>SW Weather</title>
   </head>
   <body>

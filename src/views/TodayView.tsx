@@ -57,11 +57,14 @@ export function TodayView() {
       {/* Solid dark base for the dense sub-views */}
       {!onVisual && <div className="absolute inset-0 z-0 bg-[#0a0f1c]" />}
 
-      {/* Sub-view segmented control — translucent on Visual, solid on others */}
+      {/* Sub-view segmented control — translucent on Visual, solid on others.
+          Top-padded by the safe-area inset so the tab text doesn't collide
+          with the iPhone status bar / notch when viewport-fit=cover is on. */}
       <div
-        className={`relative z-10 flex shrink-0 items-center gap-1 px-3 py-2 ${
+        className={`relative z-10 flex shrink-0 items-center gap-1 px-3 pb-2 ${
           onVisual ? '' : 'border-b border-[#141d2a] bg-[#0a0f1c]'
         }`}
+        style={{ paddingTop: `calc(env(safe-area-inset-top, 0px) + 8px)` }}
       >
         {SUB_VIEWS.map((s) => {
           const active = todaySub === s.key;
