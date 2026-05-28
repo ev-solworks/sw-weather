@@ -37,9 +37,11 @@ import {
   type CellColor,
 } from '@/scales/wgScales';
 
-const HOUR_W = 44;
-const LABEL_W_EXPANDED = 100;
-const LABEL_W_COLLAPSED = 38;
+// Cell width tightened to fit ~10 hourly columns inside a 380px-wide viewport
+// (was 44 → 38). Values stay readable at 12-13px tabular-nums.
+const HOUR_W = 38;
+const LABEL_W_EXPANDED = 92;
+const LABEL_W_COLLAPSED = 34;
 
 export function TodayWindguru({ weather }: { weather: WeatherConditions }) {
   const { hours, location } = weather;
@@ -48,7 +50,9 @@ export function TodayWindguru({ weather }: { weather: WeatherConditions }) {
   let nowIdx = hours.findIndex((h) => h.time.getTime() >= nowMs);
   if (nowIdx < 0) nowIdx = 0;
 
-  const [labelsOpen, setLabelsOpen] = useState(true);
+  // Start collapsed: icons-only label column saves ~58px of horizontal room
+  // and shows ~2 more hourly cells on first view. User can expand via toggle.
+  const [labelsOpen, setLabelsOpen] = useState(false);
   const [windUnit, setWindUnit] = useState<WindUnit>(loadWindUnit);
   const [tempUnit, setTempUnit] = useState<TempUnit>(loadTempUnit);
   const LABEL_W = labelsOpen ? LABEL_W_EXPANDED : LABEL_W_COLLAPSED;
@@ -153,7 +157,19 @@ export function TodayWindguru({ weather }: { weather: WeatherConditions }) {
             render={(h) => <ScaleCell scale={tempScale} v={h.feelsLike} text={String(toTemp(h.feelsLike, tempUnit))} muted />} />
 
           <Row label="Sky" icon={ICON.sky} labelsOpen={labelsOpen} labelW={LABEL_W} hours={hours} flags={flags}
-            render={(h) => <Cell bg="#0a0f1c" fg="#fafafa"><WxIcon desc={h.description} size={18} color="#cfcfcf" strokeWidth={1.5} night={h.isNight} /></Cell>} />
+            render={(h) => (
+              <Cell bg="#0a0f1c" fg="#fafafa">
+                <span className="relative inline-flex">
+                  <WxIcon desc={h.description} size={18} color="#cfcfcf" strokeWidth={1.5} night={h.isNight} />
+                  {h.adjusted && (
+                    <span
+                      className="absolute -right-1.5 -top-1 h-1.5 w-1.5 rounded-full bg-amber-400/90"
+                      title={`Adjusted from ${h.adjusted.from} — ${h.adjusted.reason}`}
+                    />
+                  )}
+                </span>
+              </Cell>
+            )} />
 
           <Row label="Rain prob" icon={ICON.rainProb} unit="%" labelsOpen={labelsOpen} labelW={LABEL_W} hours={hours} flags={flags}
             render={(h) => (h.precipProbability < 5 ? <Dot /> : <ScaleCell scale={rainScale} v={h.precipProbability} bold={h.precipProbability >= 70} />)} />
@@ -297,16 +313,19 @@ const ICON = (() => {
 
 function Legend() {
   const chips: { label: string; colors: string[] }[] = [
-    { label: 'Wind km/h', colors: ['#1a2030', '#1f3a4d', '#214a4a', '#1f5a3a', '#3a6020', '#6a5e1a', '#8a4a1a', '#a8331e', '#a4205a', '#6a2899'] },
-    { label: 'Wave m', colors: ['#1c2240', '#2b3268', '#4a4f9c', '#6f5fc8', '#9a4fd4'] },
-    { label: 'Temp °C', colors: ['#bfd4ef', '#e8f5c8', '#fff09a', '#ffb04a', '#f4612a', '#cf3290'] },
-    { label: 'Rain %', colors: ['#1a2c4a', '#2a4f8a', '#4a7ed1', '#3a9cef', '#7fc8ff'] },
+    { label: 'Wind', colors: ['#1a2030', '#1f3a4d', '#214a4a', '#1f5a3a', '#3a6020', '#6a5e1a', '#8a4a1a', '#a8331e', '#a4205a', '#6a2899'] },
+    { label: 'Wave', colors: ['#1c2240', '#2b3268', '#4a4f9c', '#6f5fc8', '#9a4fd4'] },
+    { label: 'Temp', colors: ['#bfd4ef', '#e8f5c8', '#fff09a', '#ffb04a', '#f4612a', '#cf3290'] },
+    { label: 'Rain', colors: ['#1a2c4a', '#2a4f8a', '#4a7ed1', '#3a9cef', '#7fc8ff'] },
   ];
+  // Equal-width chips fitting the viewport (no scroll). 4 columns, label above
+  // a thin gradient strip. Compact enough that all four sit side-by-side on
+  // mobile without horizontal overflow.
   return (
-    <div className="flex shrink-0 gap-2.5 overflow-x-auto border-t border-[#131a2e] bg-[#070b1a] px-3.5 py-2 [scrollbar-width:none]">
+    <div className="grid shrink-0 grid-cols-4 gap-1.5 border-t border-[#131a2e] bg-[#070b1a] px-3 py-1.5">
       {chips.map((c) => (
-        <div key={c.label} className="flex min-w-[110px] shrink-0 flex-col gap-1">
-          <span className="text-[9px] font-semibold uppercase tracking-wide text-neutral-500">{c.label}</span>
+        <div key={c.label} className="flex min-w-0 flex-col gap-0.5">
+          <span className="truncate text-[9px] font-semibold uppercase tracking-wide text-neutral-500">{c.label}</span>
           <div className="flex h-1.5 overflow-hidden rounded-sm border border-[#1b2440]">
             {c.colors.map((col, i) => <div key={i} className="h-full flex-1" style={{ background: col }} />)}
           </div>

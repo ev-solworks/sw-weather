@@ -1,136 +1,121 @@
 /**
- * WxIcon — line-style weather glyph for a ConditionCode. Single stroke color,
- * scalable. Night variants swap sun→moon. Matches the design handoff's WxIcon role.
+ * WxIcon — full-color animated Meteocons glyph for a ConditionCode.
+ *
+ * Backed by @bybas/weather-icons (Meteocons fork, MIT). SVGs are loaded as
+ * raw strings (Vite `?raw`) and inlined via `dangerouslySetInnerHTML` so the
+ * embedded SMIL animations actually run — browsers disable SMIL when an SVG
+ * is loaded via `<img src>`. Bundle cost: ~2-4 KB per icon, all tree-shaken.
+ *
+ * Resolution is keyed by `(desc, night)`. Daytime presentations
+ * ('Sunny'/'Mostly sunny') always render day variants. Ambiguous codes
+ * ('Clear', 'Partly cloudy') swap on `night`.
+ *
+ * `color` / `strokeWidth` props kept for API compat; ignored (full-color).
  */
-
 import type { ConditionCode } from '@/types/weather';
+
+// Raw SVG strings (so inline injection preserves SMIL animations).
+import clearDay from '@bybas/weather-icons/design/fill/animation-ready/clear-day.svg?raw';
+import clearNight from '@bybas/weather-icons/design/fill/animation-ready/clear-night.svg?raw';
+import partlyDay from '@bybas/weather-icons/design/fill/animation-ready/partly-cloudy-day.svg?raw';
+import partlyNight from '@bybas/weather-icons/design/fill/animation-ready/partly-cloudy-night.svg?raw';
+import overcastDay from '@bybas/weather-icons/design/fill/animation-ready/overcast-day.svg?raw';
+import overcastNight from '@bybas/weather-icons/design/fill/animation-ready/overcast-night.svg?raw';
+import drizzle from '@bybas/weather-icons/design/fill/animation-ready/drizzle.svg?raw';
+import rain from '@bybas/weather-icons/design/fill/animation-ready/rain.svg?raw';
+import thunderstormsDay from '@bybas/weather-icons/design/fill/animation-ready/thunderstorms-day-rain.svg?raw';
+import thunderstormsNight from '@bybas/weather-icons/design/fill/animation-ready/thunderstorms-night-rain.svg?raw';
+import snow from '@bybas/weather-icons/design/fill/animation-ready/snow.svg?raw';
+import fogDay from '@bybas/weather-icons/design/fill/animation-ready/fog-day.svg?raw';
+import fogNight from '@bybas/weather-icons/design/fill/animation-ready/fog-night.svg?raw';
+import hazeDay from '@bybas/weather-icons/design/fill/animation-ready/haze-day.svg?raw';
+import hazeNight from '@bybas/weather-icons/design/fill/animation-ready/haze-night.svg?raw';
+import notAvailable from '@bybas/weather-icons/design/fill/animation-ready/not-available.svg?raw';
+import sunriseSvg from '@bybas/weather-icons/design/fill/animation-ready/sunrise.svg?raw';
+import windSvg from '@bybas/weather-icons/design/fill/animation-ready/wind.svg?raw';
+import thermoSvg from '@bybas/weather-icons/design/fill/animation-ready/thermometer.svg?raw';
+import umbrellaSvg from '@bybas/weather-icons/design/fill/animation-ready/umbrella.svg?raw';
 
 interface WxIconProps {
   desc: ConditionCode;
   size?: number;
+  /** @deprecated kept for API compat, ignored (Meteocons are full-color). */
   color?: string;
+  /** @deprecated kept for API compat, ignored. */
   strokeWidth?: number;
   night?: boolean;
   className?: string;
 }
 
-export function WxIcon({ desc, size = 24, color = 'currentColor', strokeWidth = 1.4, night = false, className }: WxIconProps) {
-  const common = {
-    width: size,
-    height: size,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: color,
-    strokeWidth,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    className,
-    role: 'img',
-    'aria-label': desc,
-  };
-
-  const sunOrMoon =
-    night ? (
-      <path d="M20 14.5A8 8 0 119.5 4a6.5 6.5 0 1010.5 10.5z" />
-    ) : (
-      <>
-        <circle cx="12" cy="12" r="4" />
-        <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-      </>
-    );
-
-  const cloud = <path d="M7 18a4 4 0 010-8 5 5 0 019.6-1.3A3.5 3.5 0 0117 18H7z" />;
-
+function svgFor(desc: ConditionCode, night: boolean): string {
   switch (desc) {
-    case 'Clear':
-    case 'Sunny':
-      return <svg {...common}>{sunOrMoon}</svg>;
-
-    case 'Mostly clear':
-    case 'Mostly sunny':
-    case 'Partly cloudy':
-      return (
-        <svg {...common}>
-          {night ? (
-            <path d="M17 12.5A5.5 5.5 0 1110 6" />
-          ) : (
-            <>
-              <circle cx="8" cy="8" r="3" />
-              <path d="M8 2v1.5M8 12.5V14M2 8h1.5M12.5 8H14M3.8 3.8l1 1M11.2 11.2l1 1M3.8 12.2l1-1" />
-            </>
-          )}
-          <path d="M9 19a3.5 3.5 0 010-7 4.5 4.5 0 018.6-1.2A3 3 0 0117 19H9z" />
-        </svg>
-      );
-
-    case 'Cloudy':
-      return <svg {...common}>{cloud}</svg>;
-
-    case 'Fog':
-      return (
-        <svg {...common}>
-          {cloud}
-          <path d="M5 21h14M7 18.5h10" opacity={0.6} />
-        </svg>
-      );
-
-    case 'Haze':
-      // Sun (or moon) with two hazy horizontal bands across — bright sky with suspended dust/mist.
-      return (
-        <svg {...common}>
-          {night ? (
-            <path d="M19 14A6 6 0 1110 5a5 5 0 009 9z" />
-          ) : (
-            <>
-              <circle cx="12" cy="10" r="3.5" />
-              <path d="M12 3v1.5M12 15.5V17M3.5 10H5M19 10h1.5M5.6 3.6l1 1M17.4 16.4l1 1M5.6 16.4l1-1M17.4 3.6l1-1" />
-            </>
-          )}
-          <path d="M3 19h6M11 19h4M17 19h4M5 21.5h5M12 21.5h4M18 21.5h3" opacity={0.55} />
-        </svg>
-      );
-
-    case 'Light rain':
-      return (
-        <svg {...common}>
-          {cloud}
-          <path d="M9 20l-1 2M13 20l-1 2" />
-        </svg>
-      );
-
-    case 'Rain':
-      return (
-        <svg {...common}>
-          {cloud}
-          <path d="M8 20l-1.2 2.5M12 20l-1.2 2.5M16 20l-1.2 2.5" />
-        </svg>
-      );
-
-    case 'Heavy rain':
-      return (
-        <svg {...common}>
-          {cloud}
-          <path d="M7 19.5l-1.5 3M11 19.5l-1.5 3M15 19.5l-1.5 3M9 19.5l-1.5 3M13 19.5l-1.5 3" />
-        </svg>
-      );
-
-    case 'Thunder':
-      return (
-        <svg {...common}>
-          {cloud}
-          <path d="M12 19l-2 3h3l-2 3" />
-        </svg>
-      );
-
-    case 'Snow':
-      return (
-        <svg {...common}>
-          {cloud}
-          <path d="M8 21h.01M12 22h.01M16 21h.01M10 20h.01M14 20h.01" />
-        </svg>
-      );
-
-    default:
-      return <svg {...common}>{cloud}</svg>;
+    case 'Sunny':         return clearDay;
+    case 'Mostly sunny':  return partlyDay;
+    case 'Clear':         return night ? clearNight : clearDay;
+    case 'Mostly clear':  return night ? partlyNight : partlyDay;
+    case 'Partly cloudy': return night ? partlyNight : partlyDay;
+    case 'Cloudy':        return night ? overcastNight : overcastDay;
+    case 'Light rain':    return drizzle;
+    case 'Rain':          return rain;
+    case 'Heavy rain':    return rain; // Meteocons has no 'extreme-rain'
+    case 'Thunder':       return night ? thunderstormsNight : thunderstormsDay;
+    case 'Snow':          return snow;
+    case 'Fog':           return night ? fogNight : fogDay;
+    case 'Haze':          return night ? hazeNight : hazeDay;
+    default:              return notAvailable;
   }
+}
+
+/**
+ * Force the SVG root to a given width/height so the inline icon scales
+ * regardless of the file's native viewBox. The source SVGs ship 64×64; we
+ * patch the opening `<svg ...>` to drop any width/height attrs and add ours.
+ */
+function sized(svg: string, size: number): string {
+  return svg
+    .replace(/<svg([^>]*)\swidth="[^"]*"/, '<svg$1')
+    .replace(/<svg([^>]*)\sheight="[^"]*"/, '<svg$1')
+    .replace(/<svg /, `<svg width="${size}" height="${size}" `);
+}
+
+/**
+ * Non-condition Meteocons tags — wind/sun/thermo/umbrella. Useful when an
+ * annotation refers to a phenomenon rather than a sky state (e.g. "Peak gust",
+ * "Golden hour", "Cooling toward low").
+ */
+export type WxTag = 'wind' | 'sun' | 'thermo' | 'umbrella';
+function svgForTag(tag: WxTag): string {
+  switch (tag) {
+    case 'wind': return windSvg;
+    case 'sun': return sunriseSvg;
+    case 'thermo': return thermoSvg;
+    case 'umbrella': return umbrellaSvg;
+    default: return notAvailable;
+  }
+}
+
+export function WxTagIcon({ tag, size = 16, className }: { tag: WxTag; size?: number; className?: string }) {
+  const html = sized(svgForTag(tag), size);
+  return (
+    <span
+      role="img"
+      aria-label={tag}
+      className={className}
+      style={{ display: 'inline-flex', width: size, height: size, lineHeight: 0 }}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+
+export function WxIcon({ desc, size = 24, night = false, className }: WxIconProps) {
+  const html = sized(svgFor(desc, night), size);
+  return (
+    <span
+      role="img"
+      aria-label={desc}
+      className={className}
+      style={{ display: 'inline-flex', width: size, height: size, lineHeight: 0 }}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
 }

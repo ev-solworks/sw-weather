@@ -19,4 +19,10 @@ body,
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Prevent pinch-zoom + double-tap zoom on iOS Safari (viewport meta alone
+     is honored inconsistently). touch-action: manipulation removes the
+     double-tap-to-zoom delay too. */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
 }
+

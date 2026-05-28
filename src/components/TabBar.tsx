@@ -80,7 +80,7 @@ export function TabBar() {
   const { tab, setTab } = useNav();
   return (
     <nav
-      className="flex shrink-0 items-stretch border-t border-[#1a2533] bg-[#0a0f1c] pb-[env(safe-area-inset-bottom)]"
+      className="flex shrink-0 items-stretch border-t border-[#1a2533] bg-[#0a0f1c] pb-2"
       aria-label="Primary"
     >
       {TABS.map((t) => {
@@ -92,7 +92,7 @@ export function TabBar() {
             disabled={!t.enabled}
             onClick={() => t.enabled && setTab(t.key)}
             aria-current={active ? 'page' : undefined}
-            className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${
+            className={`flex flex-1 flex-col items-center gap-0.5 py-1.5 text-[10px] font-medium transition-colors ${
               active ? 'text-neutral-50' : t.enabled ? 'text-neutral-500' : 'text-neutral-700'
             }`}
           >

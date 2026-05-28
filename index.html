@@ -3,8 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>scaffold</title>
+    <!-- Lock zoom: PWA-like behavior. user-scalable=no disables pinch-zoom +
+         iOS Safari's auto-zoom on text-input focus. NO viewport-fit=cover —
+         we don't render content under the home indicator and that just steals
+         pixels for the safe-area inset on every fixed-bottom UI. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no"
+    />
+    <title>SW Weather</title>
   </head>
   <body>
     <div id="root"></div>

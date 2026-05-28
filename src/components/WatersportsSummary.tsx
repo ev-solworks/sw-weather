@@ -1,8 +1,11 @@
 /**
- * WatersportsSummary — a practical "should I go out" read for coastal locations.
- * Plain-language current sea state (wave height @ period, direction), sea temp,
- * wind-vs-wave alignment (cross/onshore/offshore feel), and the marine source +
- * confidence badge (the eltiempo.es differentiator, surfaced for the first time).
+ * SeaConditionsSummary — current sea state header on the Detail view for
+ * coastal locations. Wave height @ period + direction, sea temp, and the
+ * marine source/confidence badge.
+ *
+ * Production-relevant for water-side shoots (boats, marinas, beach scenes) —
+ * the team needs to know "is the boat going to roll" without seeing it
+ * framed as a watersports planning tool.
  *
  * Renders nothing if the active hour has no wave data (inland / no source).
  */
@@ -10,20 +13,12 @@
 import type { WeatherConditions } from '@/types/weather';
 import { compass } from '@/utils/format';
 
-/** Relationship of wind direction to wave direction (both "from" degrees). */
-function windWaveRelation(windDeg: number, waveDeg: number): string {
-  let diff = Math.abs(((windDeg - waveDeg + 180) % 360) - 180);
-  if (diff <= 35) return 'Wind with swell';
-  if (diff >= 145) return 'Offshore wind';
-  return 'Cross wind';
-}
-
-/** Short swell-quality phrase from period. */
+/** Short swell-quality phrase from period. Neutral, no surfer language. */
 function swellQuality(periodS: number | null): string {
   if (periodS == null) return '';
-  if (periodS >= 11) return 'clean groundswell';
+  if (periodS >= 11) return 'long-period swell';
   if (periodS >= 8) return 'organised swell';
-  return 'short wind-chop';
+  return 'short chop';
 }
 
 export function WatersportsSummary({ weather }: { weather: WeatherConditions }) {
@@ -37,7 +32,6 @@ export function WatersportsSummary({ weather }: { weather: WeatherConditions }) 
   const marine = sources.marine;
   const period = h.wavePeriod;
   const dir = h.waveDirection;
-  const rel = dir != null ? windWaveRelation(current.windDirection, dir) : null;
   const quality = swellQuality(period);
 
   const summary =
@@ -49,12 +43,11 @@ export function WatersportsSummary({ weather }: { weather: WeatherConditions }) 
   return (
     <div className="border-b border-[#131a2e] bg-[#0a1326] px-4 py-3">
       <div className="flex items-center justify-between">
-        <span className="font-mono text-[10px] font-semibold tracking-wide text-sky-300/80">WATERSPORTS · NOW</span>
+        <span className="font-mono text-[10px] font-semibold tracking-wide text-sky-300/80">SEA · NOW</span>
         {marine && <ConfidenceBadge source={marine.source} confidence={marine.confidence} />}
       </div>
       <div className="mt-1 text-[15px] font-medium text-neutral-100">{summary}</div>
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-neutral-400">
-        {rel && <span>{rel}</span>}
         <span>Wind {current.windSpeed} km/h {compass(current.windDirection)}</span>
         {h.seaTemperature != null && <span>Sea {Math.round(h.seaTemperature)}°</span>}
       </div>

@@ -70,6 +70,13 @@ export interface OpenMeteoForecast {
     sunrise: string[];
     sunset: string[];
   };
+  // Optional minutely_15 block when requested. Returns the next ~16 quarter-hour
+  // slots (4h) of precip; we slice to the first 60 min in the client.
+  minutely_15?: {
+    time: string[];
+    precipitation?: number[];
+    rain?: number[];
+  };
 }
 
 const HOURLY_VARS = [

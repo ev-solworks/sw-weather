@@ -66,11 +66,24 @@ function WeekBody({ weather }: { weather: WeatherConditions }) {
         <span className="min-w-[22px] text-center font-mono text-[9px] font-semibold tabular-nums text-[#7a8aa3]">{scaleMax}°</span>
       </div>
 
-      {/* Day rows */}
+      {/* Day rows. Today's row is overlaid with current observed conditions
+          so it matches Visual — AEMET's full-day summary often differs from
+          right-now (zero wind, "Cloudy" when actually clear). */}
       <div className="mx-3 overflow-hidden rounded-xl border border-[#1b2440] bg-[#0c1428]">
-        {days.map((d, i) => (
-          <DayRow key={d.date.getTime()} day={d} isToday={d.dayName === 'Today'} last={i === days.length - 1} scaleMin={scaleMin} scaleRange={scaleRange} />
-        ))}
+        {days.map((d, i) => {
+          const isToday = d.dayName === 'Today';
+          const overlay = isToday
+            ? {
+                ...d,
+                description: weather.current.description,
+                windAvg: d.windAvg || weather.current.windSpeed,
+                windDirection: d.windDirection || weather.current.windDirection,
+              }
+            : d;
+          return (
+            <DayRow key={d.date.getTime()} day={overlay} isToday={isToday} last={i === days.length - 1} scaleMin={scaleMin} scaleRange={scaleRange} />
+          );
+        })}
       </div>
 
       <div className="px-4 pb-4 pt-2.5 text-center font-mono text-[10px] text-[#5a6485]">

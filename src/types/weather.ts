@@ -115,6 +115,13 @@ export interface HourForecast {
   wavePeriod: number | null; // s
   waveDirection: number | null; // degrees, 0 = FROM north
   seaTemperature: number | null; // °C (sea-surface)
+
+  /**
+   * Optional note when the description was overridden from the upstream forecast
+   * (e.g. AEMET model called Fog but live station obs showed dry air). UI can
+   * render a subtle 'adjusted' badge. Undefined when the forecast is unmodified.
+   */
+  adjusted?: { from: ConditionCode; reason: string };
 }
 
 /**
@@ -293,6 +300,20 @@ export interface WeatherConditions {
   sources: SourceMap;
   /** Live measured wind history (present only when a live station is configured). */
   windHistory?: WindHistory;
+  /** 15-minute precipitation nowcast for the next hour — drives the "rain in N min" banner. */
+  rainNowcast?: RainNowcast;
   /** ISO instant this bundle was assembled (for the "updated X ago" line). */
   assembledAt: string;
+}
+
+/**
+ * 15-min precipitation nowcast. Each slot is a 15-minute window starting at
+ * `time`; `mm` is the forecast precip for that window. The client renders a
+ * "rain in N min" banner when any slot in the next 60 min has mm > 0.
+ */
+export interface RainNowcast {
+  source: SourceId;
+  /** Generated ~now; slots are in chronological order starting from the slot
+   * containing `now`. */
+  slots: { time: Date; mm: number }[];
 }

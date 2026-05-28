@@ -5,9 +5,14 @@
  * strip; wind/humidity/UV metrics; daylight sun arc. All times in location TZ.
  */
 
+import { useState } from 'react';
 import type { WeatherConditions } from '@/types/weather';
 import { WeatherBackdrop } from '@/components/WeatherBackdrop';
 import { WxIcon } from '@/components/WxIcon';
+import { MetricDetail, type MetricKey } from '@/components/MetricDetail';
+import { RainNowcastBanner } from '@/components/RainNowcastBanner';
+import { AnnotationStrip } from '@/components/AnnotationStrip';
+import { HistoryChip } from '@/components/HistoryChip';
 import { compass, fmtDuration, fmtTime, localHour, uvLabel } from '@/utils/format';
 
 function nearestHourIndex(hours: { time: Date }[], now: number): number {
@@ -26,6 +31,7 @@ function nearestHourIndex(hours: { time: Date }[], now: number): number {
 export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherConditions; onOpenSwitcher?: () => void }) {
   const { hours, days, location, current, sun } = weather;
   const tz = location.timezone;
+  const [detailMetric, setDetailMetric] = useState<MetricKey | null>(null);
   const nowMs = Date.now();
   const nowIdx = nearestHourIndex(hours, nowMs);
   const next24 = hours.slice(nowIdx, nowIdx + 24);
@@ -39,8 +45,13 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
 
   return (
     <div className="flex w-full flex-col bg-[#0a0f1c] text-neutral-200">
+      {/* Minute-by-minute rain nowcast — only renders when precip in next 60 min. */}
+      <RainNowcastBanner nowcast={weather.rainNowcast} />
+
       {/* ── Hero ─────────────────────────────────────────────── */}
-      <div className="relative h-[360px] shrink-0 overflow-hidden">
+      {/* Vertical stack hero — 342px (was 360, ~5% shorter) so daylight pill
+          stays above the tabbar without scrolling. */}
+      <div className="relative h-[342px] shrink-0 overflow-hidden">
         <WeatherBackdrop desc={current.description} hour={heroHour} />
 
         <div className="relative z-10 flex h-full flex-col px-4 pb-3 pt-2 text-neutral-50">
@@ -59,6 +70,7 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
             <button
               className="flex h-[34px] w-[34px] items-center justify-center rounded-full border border-white/15 bg-white/10 backdrop-blur"
               aria-label="Search"
+              onClick={onOpenSwitcher}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <circle cx="7" cy="7" r="5" />
@@ -67,22 +79,22 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
             </button>
           </div>
 
-          {/* Stack */}
-          <div className="flex flex-1 flex-col items-center justify-center">
-            <div className="mb-1.5 rounded-sm bg-black/25 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-[1.4px] text-white/85">
+          {/* Vertical stack: NOW pill → icon → temp → condition → H/L. */}
+          <div className="flex flex-1 flex-col items-center justify-center gap-0.5">
+            <div className="rounded-sm bg-black/25 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-[1.4px] text-white/85">
               NOW · {fmtTime(current.observedAt, tz)}
             </div>
             <div className="drop-shadow-[0_4px_24px_rgba(0,0,0,.4)]">
-              <WxIcon desc={current.description} size={108} color="#fafafa" strokeWidth={1.1} night={night} />
+              <WxIcon desc={current.description} size={84} color="#fafafa" strokeWidth={1.1} night={night} />
             </div>
-            <div className="mt-1 flex items-start tabular-nums">
-              <span className="text-[96px] font-thin leading-[0.9] tracking-[-5px] text-neutral-50">
+            <div className="flex items-start tabular-nums leading-none">
+              <span className="text-[76px] font-thin leading-[0.9] tracking-[-4px] text-neutral-50">
                 {current.temperature}
               </span>
-              <span className="mt-1.5 text-5xl font-thin leading-none text-white/55">°</span>
+              <span className="mt-1 text-[36px] font-thin leading-none text-white/55">°</span>
             </div>
-            <div className="mt-0.5 text-[15px] font-medium text-neutral-50">{current.description}</div>
-            <div className="mt-0.5 text-[11px] tabular-nums text-white/65">
+            <div className="text-[14px] font-medium text-neutral-50">{current.description}</div>
+            <div className="text-[11px] tabular-nums text-white/65">
               H {hi}° · L {lo}°
             </div>
           </div>
@@ -100,6 +112,9 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
             {strip.map((h, i) => {
               const isNow = i === 0;
               const rainy = h.precipProbability >= 30;
+              // The first cell ("Now") shows the live observed temp so it
+              // matches the hero — the forecast hour is often 1-3°C off.
+              const tempC = isNow ? current.temperature : h.temperature;
               return (
                 <div
                   key={h.time.getTime()}
@@ -110,7 +125,7 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
                   <div className={`text-[11px] tabular-nums ${isNow ? 'font-semibold text-neutral-50' : 'text-neutral-500'}`}>
                     {isNow ? 'Now' : fmtTime(h.time, tz)}
                   </div>
-                  <WxIcon desc={h.description} size={20} color={isNow ? '#fafafa' : '#cfcfcf'} strokeWidth={1.4} night={h.isNight} />
+                  <WxIcon desc={isNow ? current.description : h.description} size={20} color={isNow ? '#fafafa' : '#cfcfcf'} strokeWidth={1.4} night={isNow ? current.isNight : h.isNight} />
                   {rainy ? (
                     <div className="h-[11px] text-[10px] leading-[11px] text-sky-300">
                       {h.precipProbability}
@@ -120,7 +135,7 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
                     <div className="h-[11px]" />
                   )}
                   <div className={`mt-0.5 text-sm font-medium ${isNow ? 'text-neutral-50' : 'text-neutral-200'}`}>
-                    {h.temperature}°
+                    {tempC}°
                   </div>
                 </div>
               );
@@ -128,23 +143,36 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
           </div>
         </div>
 
-        {/* Metrics */}
+        {/* Plain-language production cues — drone window, golden hour, etc. */}
+        <AnnotationStrip weather={weather} />
+
+        {/* Metrics — each card opens its drilldown detail. */}
         <div className="grid grid-cols-3 gap-2 px-4 pb-3.5 pt-2">
-          <Metric label="Wind" value={`${current.windSpeed}`} unit={`km/h ${compass(current.windDirection)}`} live={weather.sources.wind?.source === 'oceandrivers'} />
-          <Metric label="Humidity" value={`${current.humidity}`} unit="%" />
-          <Metric label="UV" value={`${uv}`} unit={uvLabel(uv)} />
+          <Metric label="Wind" value={`${current.windSpeed}`} unit={`km/h ${compass(current.windDirection)}`} live={weather.sources.wind?.source === 'oceandrivers'} onTap={() => setDetailMetric('wind')} />
+          <Metric label="Humidity" value={`${current.humidity}`} unit="%" onTap={() => setDetailMetric('humidity')} />
+          <Metric label="UV" value={`${uv}`} unit={uvLabel(uv)} onTap={() => setDetailMetric('uv')} />
         </div>
 
         {/* Sun arc */}
         <SunArc sunrise={sun.sunrise} sunset={sun.sunset} tz={tz} nowMs={nowMs} />
+
+        {/* Historical context — last year same day */}
+        <HistoryChip weather={weather} />
       </div>
+
+      {/* Drilldown overlay — rendered last so it sits on top of the whole view. */}
+      {detailMetric && (
+        <MetricDetail weather={weather} initialMetric={detailMetric} onClose={() => setDetailMetric(null)} />
+      )}
     </div>
   );
 }
 
-function Metric({ label, value, unit, live }: { label: string; value: string; unit: string; live?: boolean }) {
+function Metric({ label, value, unit, live, onTap }: { label: string; value: string; unit: string; live?: boolean; onTap?: () => void }) {
   return (
-    <div className="flex flex-col gap-1 rounded-xl border border-[#1d2533] bg-[#131c2a] px-3 py-2.5">
+    <button
+      onClick={onTap}
+      className="flex flex-col gap-1 rounded-xl border border-[#1d2533] bg-[#131c2a] px-3 py-2.5 text-left transition-colors hover:bg-[#161f30] active:bg-[#0f1726]">
       <div className="flex items-center gap-1.5">
         <div className="font-mono text-[10px] font-semibold tracking-[1px] text-neutral-500">{label}</div>
         {live && (
@@ -158,7 +186,7 @@ function Metric({ label, value, unit, live }: { label: string; value: string; un
         <span className="font-mono text-lg font-medium tabular-nums text-neutral-50">{value}</span>
         <span className="text-[10px] text-neutral-500">{unit}</span>
       </div>
-    </div>
+    </button>
   );
 }
 

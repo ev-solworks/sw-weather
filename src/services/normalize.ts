@@ -21,6 +21,7 @@ import type {
   FieldProvenance,
   HourForecast,
   Location,
+  RainNowcast,
   SourceId,
   SourceMap,
   WeatherConditions,
@@ -68,6 +69,68 @@ function omTime(s: string): Date {
   return new Date(s);
 }
 
+/**
+ * Build a RainNowcast from Open-Meteo's `minutely_15` block. Slots span the
+ * next 60 min starting from the 15-min boundary at or before `now`. Falls
+ * back to undefined when the block is missing or all-zero — the UI hides the
+ * banner in that case.
+ */
+function rainNowcastFromOm(om: om.OpenMeteoForecast): RainNowcast | undefined {
+  const m = om.minutely_15;
+  if (!m?.time || !m.precipitation) return undefined;
+  const now = Date.now();
+  const slots: { time: Date; mm: number }[] = [];
+  for (let i = 0; i < m.time.length; i++) {
+    const t = omTime(m.time[i]);
+    if (t.getTime() < now - 15 * 60_000) continue; // skip past slots
+    slots.push({ time: t, mm: m.precipitation[i] ?? 0 });
+    if (slots.length >= 4) break; // 4 × 15-min = 60 min
+  }
+  if (!slots.length) return undefined;
+  return { source: 'open-meteo', slots };
+}
+
+/**
+ * Overlay UV index + cloud cover from an Open-Meteo forecast onto AEMET-built
+ * hours, matching by local-naive hour. Leaves the rest of the AEMET hour
+ * untouched. Used for ES locations where AEMET has no per-hour UV.
+ */
+function overlayUvCloudFromOm(hours: HourForecast[], om: om.OpenMeteoForecast): HourForecast[] {
+  const idx = new Map<string, number>();
+  om.hourly.time.forEach((t, i) => idx.set(t, i));
+  const key = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    return `${y}-${m}-${day}T${h}:00`;
+  };
+  return hours.map((h) => {
+    const i = idx.get(key(h.time));
+    if (i === undefined) return h;
+    const uv = om.hourly.uv_index?.[i];
+    const cc = om.hourly.cloud_cover?.[i];
+    return {
+      ...h,
+      uvIndex: Number.isFinite(uv) ? Math.round(uv as number) : h.uvIndex,
+      cloudCover: Number.isFinite(cc) ? (cc as number) : h.cloudCover,
+    };
+  });
+}
+
+/**
+ * Append OM-only hours past the last AEMET hour so the Graph 72h+ range has
+ * data to plot. AEMET municipal hourly forecasts only cover ~48h; OM covers 7
+ * days. We keep AEMET hours unchanged (better accuracy) and add OM hours after.
+ */
+function extendHoursWithOm(hours: HourForecast[], om: om.OpenMeteoForecast, marine: om.OpenMeteoMarine | null): HourForecast[] {
+  if (!hours.length) return hoursFromOpenMeteo(om, marine);
+  const lastT = hours[hours.length - 1].time.getTime();
+  const omAll = hoursFromOpenMeteo(om, marine);
+  const extra = omAll.filter((h) => h.time.getTime() > lastT);
+  return extra.length ? hours.concat(extra) : hours;
+}
+
 /** Build HourForecast[] from an Open-Meteo forecast + optional marine arrays. */
 function hoursFromOpenMeteo(f: om.OpenMeteoForecast, marine: om.OpenMeteoMarine | null): HourForecast[] {
   const h = f.hourly;
@@ -99,6 +162,33 @@ function hoursFromOpenMeteo(f: om.OpenMeteoForecast, marine: om.OpenMeteoMarine 
   });
 }
 
+/** Build DayForecast[] from an Open-Meteo daily block. Used by the OM fallback. */
+function daysFromOpenMeteo(f: om.OpenMeteoForecast, timezone: string): DayForecast[] {
+  const d = f.daily;
+  return d.time.map((t, i) => {
+    const date = new Date(t + 'T00:00:00');
+    return {
+      date,
+      dayName: dayName(date, timezone),
+      tempHi: Math.round(d.temperature_2m_max[i]),
+      tempLo: Math.round(d.temperature_2m_min[i]),
+      tempCurrent: null,
+      description: wmoToCondition(d.weather_code[i]),
+      rainProbability: d.precipitation_probability_max[i] ?? 0,
+      rainAmount: d.precipitation_sum[i] ?? 0,
+      windAvg: Math.round(d.wind_speed_10m_max[i] ?? 0),
+      windGust: Math.round(d.wind_gusts_10m_max[i] ?? 0),
+      windDirection: d.wind_direction_10m_dominant[i] ?? 0,
+      uvMax: Math.round(d.uv_index_max[i] ?? 0),
+      sunrise: new Date(d.sunrise[i]),
+      sunset: new Date(d.sunset[i]),
+      waveHeight: null,
+      wavePeriod: null,
+      seaTemperature: null,
+    };
+  });
+}
+
 function currentFromHour(hour: HourForecast): CurrentConditions {
   return {
     temperature: hour.temperature,
@@ -123,13 +213,23 @@ interface AemetObsReading {
   ta?: number; // air temperature °C
   hr?: number; // relative humidity %
   pres?: number; // pressure hPa
+  vv?: number; // wind speed m/s (10-min mean)
+}
+
+/** Parsed AEMET obs summary (latest non-null reading for each field). */
+interface AemetObs {
+  ta: number | null;
+  hr: number | null;
+  pres: number | null;
+  windKmh: number | null; // m/s → km/h
+  fint: Date | null;
 }
 
 /**
  * Pick the latest usable reading from an AEMET station obs payload (array of
- * hourly readings). Returns measured temp/humidity/pressure + obs time, or null.
+ * hourly readings). Returns measured temp/humidity/pressure/wind + obs time.
  */
-function parseAemetObs(payload: unknown): { ta: number | null; hr: number | null; pres: number | null; fint: Date | null } | null {
+function parseAemetObs(payload: unknown): AemetObs | null {
   if (!Array.isArray(payload) || payload.length === 0) return null;
   // Last reading with a numeric air temperature.
   for (let i = payload.length - 1; i >= 0; i--) {
@@ -139,6 +239,7 @@ function parseAemetObs(payload: unknown): { ta: number | null; hr: number | null
         ta: Math.round(r.ta),
         hr: typeof r.hr === 'number' ? Math.round(r.hr) : null,
         pres: typeof r.pres === 'number' ? Math.round(r.pres) : null,
+        windKmh: typeof r.vv === 'number' ? Math.round(r.vv * 3.6) : null,
         fint: r.fint ? new Date(r.fint) : null,
       };
     }
@@ -219,17 +320,36 @@ function nearestHour(hours: HourForecast[], now = Date.now()): HourForecast {
 async function normalizeSpain(loc: Location, p: ProxyPayloads): Promise<WeatherConditions> {
   const hourly = p['aemet-hourly']?.[0];
   const daily = p['aemet-daily']?.[0];
-  if (!hourly || !daily) throw new Error(`ES location ${loc.id}: missing AEMET data`);
+  // User-added ES locations (no AEMET municipio) fall back to Open-Meteo —
+  // same path as Portugal. AEMET-by-coords resolver is a follow-up.
+  if (!hourly || !daily) {
+    if (p['om-forecast']) return normalizeOpenMeteoFallback(loc, p);
+    throw new Error(`ES location ${loc.id}: missing AEMET data`);
+  }
   const marine = p['om-marine'] ?? null;
 
-  const hours = aemetHourlyToHours(hourly, marine, loc.timezone);
+  let hours = aemetHourlyToHours(hourly, marine, loc.timezone);
   const days = aemetDailyToDays(daily, loc.timezone);
+
+  // AEMET hourly has no per-hour UV index or cloud_cover %. Overlay them from
+  // Open-Meteo where the times align. Keeps AEMET's MOS-corrected temp/wind/
+  // precip/sky as primary — OM only fills the gaps.
+  if (p['om-forecast']) hours = overlayUvCloudFromOm(hours, p['om-forecast']);
+
+  // AEMET hourly only covers ~48h. Extend the array with OM-only hours past
+  // the AEMET tail so the Graph view's 72h+ range has data to plot.
+  if (p['om-forecast']) hours = extendHoursWithOm(hours, p['om-forecast'], marine);
+
+  // Obs-based plausibility check: override AEMET Fog/Haze blocks when nearby
+  // stations report dry air (RH<90%) or breeze (>10 kt) — fog can't physically
+  // form in those conditions, so trust the station over the model.
+  const obs = parseAemetObs(p['aemet-obs']);
+  hours = plausibilityCheckSky(hours, obs, p.oceandrivers, loc.timezone);
   let current = currentFromHour(nearestHour(hours));
 
   // Overlay measured station observation onto current where available (temp/
   // humidity/pressure). Sky + wind stay from the forecast hour (the conventional
   // station feed has no sky code and often no wind). Provenance reflects which.
-  const obs = parseAemetObs(p['aemet-obs']);
   let tempIsObserved = false;
   if (obs) {
     current = {
@@ -250,7 +370,8 @@ async function normalizeSpain(loc: Location, p: ProxyPayloads): Promise<WeatherC
     temperature: prov('aemet', 'high'),
     wind: prov('aemet', 'high'),
     precipitation: prov('aemet', 'high'),
-    uv: prov('aemet', 'high'),
+    // UV + cloud come from OM when overlay applied (AEMET has no per-hour UV).
+    uv: prov(p['om-forecast'] ? 'open-meteo' : 'aemet', p['om-forecast'] ? 'medium' : 'high', 'best_match'),
     sky: prov('aemet', 'high'),
     sun: prov('suncalc', 'high'),
     current: prov('aemet', 'high', tempIsObserved ? 'station-obs' : 'forecast'),
@@ -268,8 +389,40 @@ async function normalizeSpain(loc: Location, p: ProxyPayloads): Promise<WeatherC
     sources.wind = prov('oceandrivers', 'high', live.station);
   }
   const windHistory = parseWindHistory(p['oceandrivers-history']);
+  const rainNowcast = p['om-forecast'] ? rainNowcastFromOm(p['om-forecast']) : undefined;
 
-  return { location: loc, current, hours, days, sun, moon, alerts: [], sources, windHistory, assembledAt: new Date().toISOString() };
+  return { location: loc, current, hours, days, sun, moon, alerts: [], sources, windHistory, rainNowcast, assembledAt: new Date().toISOString() };
+}
+
+/**
+ * Generic Open-Meteo-only normalization for user-added locations without a
+ * national-service ID (no AEMET municipio for ES, no IPMA globalIdLocal for PT).
+ * Hourly + daily both from OM `best_match`; marine when coastal. Confidence
+ * `medium` (no MOS correction, no station overlay).
+ */
+async function normalizeOpenMeteoFallback(loc: Location, p: ProxyPayloads): Promise<WeatherConditions> {
+  const omForecast = p['om-forecast'];
+  if (!omForecast) throw new Error(`${loc.id}: missing om-forecast (fallback)`);
+  const marine = p['om-marine'] ?? null;
+  const hours = hoursFromOpenMeteo(omForecast, marine);
+  const days = daysFromOpenMeteo(omForecast, loc.timezone);
+  const current = currentFromHour(nearestHour(hours));
+  stampTodayCurrent(days, current.temperature);
+  const sun = computeSunPhases(new Date(), loc.lat, loc.lon);
+  const moon = computeMoonInfo(new Date(), loc.lat, loc.lon);
+
+  const sources: SourceMap = {
+    temperature: prov('open-meteo', 'medium', 'best_match'),
+    wind: prov('open-meteo', 'medium', 'best_match'),
+    precipitation: prov('open-meteo', 'medium', 'best_match'),
+    uv: prov('open-meteo', 'medium', 'best_match'),
+    sky: prov('open-meteo', 'medium', 'best_match'),
+    sun: prov('suncalc', 'high'),
+    current: prov('open-meteo', 'medium', 'best_match'),
+  };
+  if (marine) sources.marine = prov('open-meteo-marine', 'medium', 'best_match');
+  const rainNowcast = rainNowcastFromOm(omForecast);
+  return { location: loc, current, hours, days, sun, moon, alerts: [], sources, rainNowcast, assembledAt: new Date().toISOString() };
 }
 
 async function normalizePortugal(loc: Location, p: ProxyPayloads): Promise<WeatherConditions> {
@@ -299,8 +452,9 @@ async function normalizePortugal(loc: Location, p: ProxyPayloads): Promise<Weath
   };
   if (sea) sources.marine = prov('ipma', 'high');
   else if (marine) sources.marine = prov('open-meteo-marine', islands ? 'low' : 'medium', 'best_match');
+  const rainNowcast = rainNowcastFromOm(omForecast);
 
-  return { location: loc, current, hours, days, sun, moon, alerts: [], sources, assembledAt: new Date().toISOString() };
+  return { location: loc, current, hours, days, sun, moon, alerts: [], sources, rainNowcast, assembledAt: new Date().toISOString() };
 }
 
 // ── AEMET → canonical ────────────────────────────────────────────────────────
@@ -379,6 +533,84 @@ function smoothIsolatedFog(hs: HourForecast[]): HourForecast[] {
     }
   }
   return hs;
+}
+
+/**
+ * Find the nearest non-Fog/Haze description in either direction. Falls back to
+ * 'Mostly clear' when nothing is available within the window (rare — only at
+ * the array edges, where this still beats keeping a wrong Fog code).
+ */
+function nearestClearDescription(hs: HourForecast[], i: number): ConditionCode {
+  const muddy = new Set<ConditionCode>(['Fog', 'Haze']);
+  for (let step = 1; step < hs.length; step++) {
+    const before = hs[i - step];
+    if (before && !muddy.has(before.description)) return before.description;
+    const after = hs[i + step];
+    if (after && !muddy.has(after.description)) return after.description;
+  }
+  return 'Mostly clear';
+}
+
+/**
+ * Obs-based fog/haze plausibility check. AEMET's automated MOS sometimes calls
+ * coastal Fog/Haze for full multi-hour blocks when nearby station observations
+ * say the air is dry and breezy — meteorologically incompatible with fog.
+ *
+ * Rule: for each Fog/Haze hour ON THE SAME LOCAL DAY as a station reading
+ * (within ~3h of the obs instant), if any nearby station shows
+ *   - relative humidity < 90%, OR
+ *   - wind > 10 kt (~18.5 km/h)
+ * override the description to the nearest non-muddy hour's value, stamping
+ * `adjusted` with the original code + reason so the UI can badge it.
+ *
+ * Station sources used (in order): OceanDrivers live (Bay of Palma) > AEMET
+ * conventional station obs (RH + 10-min mean wind in m/s).
+ */
+function plausibilityCheckSky(
+  hs: HourForecast[],
+  obs: AemetObs | null,
+  live: OceanDriversLive | undefined,
+  timezone: string,
+): HourForecast[] {
+  // Gather best-available RH + wind from station obs.
+  let rh: number | null = null;
+  let windKmh: number | null = null;
+  let obsTime: Date | null = null;
+
+  if (live && live.ACTIVE !== 'OFF') {
+    if (typeof live.HUMIDITY === 'number') rh = Math.round(live.HUMIDITY);
+    if (typeof live.TWS === 'number') windKmh = Math.round(live.TWS * KNOTS_TO_KMH);
+    if (live.TIME) obsTime = new Date(live.TIME);
+  }
+  if (obs) {
+    if (rh == null && obs.hr != null) rh = obs.hr;
+    if (windKmh == null && obs.windKmh != null) windKmh = obs.windKmh;
+    if (obsTime == null && obs.fint) obsTime = obs.fint;
+  }
+  if (rh == null && windKmh == null) return hs; // nothing to test against
+
+  const dry = rh != null && rh < 90;
+  const breezy = windKmh != null && windKmh > 18.5; // 10 kt
+  if (!dry && !breezy) return hs; // obs supports fog; trust forecast
+
+  const obsDayKey = obsTime ? localDateKey(obsTime, timezone) : localDateKey(new Date(), timezone);
+  const muddy = new Set<ConditionCode>(['Fog', 'Haze']);
+  const reasonBits: string[] = [];
+  if (rh != null) reasonBits.push(`RH ${rh}%`);
+  if (windKmh != null) reasonBits.push(`wind ${Math.round(windKmh / KNOTS_TO_KMH)} kt`);
+  const reason = `station obs: ${reasonBits.join(', ')}`;
+
+  return hs.map((h, i) => {
+    if (!muddy.has(h.description)) return h;
+    // Only override hours on the obs day; far-future fog stays as forecast.
+    if (localDateKey(h.time, timezone) !== obsDayKey) return h;
+    const replacement = nearestClearDescription(hs, i);
+    return {
+      ...h,
+      description: replacement,
+      adjusted: { from: h.description, reason },
+    };
+  });
 }
 
 function aemetDailyToDays(root: Awaited<ReturnType<typeof aemet.fetchDaily>>, timezone: string): DayForecast[] {
@@ -480,7 +712,12 @@ function indexSky(
 // ── Entry point ──────────────────────────────────────────────────────────────
 
 async function assemble(loc: Location): Promise<WeatherConditions> {
-  const { payloads } = await fetchFromProxy(loc.id);
+  // Pass full location metadata so the edge auto-registers user-added places
+  // (geocoded results) on first call. Idempotent for seed rows.
+  const { payloads } = await fetchFromProxy(loc.id, {
+    name: loc.name, region: loc.region, country: loc.country,
+    lat: loc.lat, lon: loc.lon, timezone: loc.timezone,
+  });
   return loc.country === 'ES' ? normalizeSpain(loc, payloads) : normalizePortugal(loc, payloads);
 }
 

@@ -42,6 +42,9 @@ export function TodaySun({ weather }: { weather: WeatherConditions }) {
     <div className="flex flex-col bg-[#070b1a] text-neutral-200">
       <SunArcHero sun={sun} now={now} tz={tz} />
 
+      {/* Countdown to the next sun event (sunrise or sunset) + length deltas. */}
+      <NextEventBar sun={sun} now={now} tz={tz} />
+
       {/* Daylight stats */}
       <div className="mx-3.5 mb-3 mt-1 flex items-stretch rounded-xl border border-[#1b2440] bg-[#0c1428] px-1 py-2.5">
         <Stat label="Daylight" value={fmtDur(dayLen)} sub={`${fmtDelta(deltaYday)} vs yesterday`} subColor={deltaYday >= 0 ? '#7fd02a' : '#f49224'} />
@@ -219,31 +222,42 @@ function TwilightStrip({ sun, now, tz }: { sun: SunPhases; now: number; tz: stri
   );
 }
 
+/**
+ * Photographic terms instead of astronomy ones. Each row marks a MOMENT (not
+ * a period), so the NOW badge attaches to the row whose time is closest to
+ * `now` rather than treating phases as ranges (the previous logic mislabelled
+ * "morning golden hour" as the active phase between 07:06 and solar noon).
+ */
 function PhaseList({ sun, now, tz }: { sun: SunPhases; now: number; tz: string }) {
   const phases = [
-    { t: sun.astroDawn, name: 'Astronomical dawn', sub: 'Stars begin to fade', color: '#2a3590', dot: 'astro' as const },
-    { t: sun.nauticalDawn, name: 'Nautical dawn', sub: 'Horizon visible', color: '#4a5fcf', dot: 'naut' as const },
-    { t: sun.civilDawn, name: 'Civil dawn', sub: 'First usable light', color: '#6a8aff', dot: 'civil' as const },
+    { t: sun.astroDawn, name: 'First light', sub: 'Sky starts to glow', color: '#2a3590', dot: 'astro' as const },
+    { t: sun.nauticalDawn, name: 'Pre-dawn blue', sub: 'Horizon becomes visible', color: '#4a5fcf', dot: 'naut' as const },
+    { t: sun.civilDawn, name: 'Blue hour begins', sub: 'Deep blue sky, soft glow', color: '#6a8aff', dot: 'civil' as const },
     { t: sun.sunrise, name: 'Sunrise', sub: 'Sun crosses horizon', color: '#e87a3a', dot: 'sun' as const, big: true },
-    { t: sun.goldenEnd, name: 'Morning golden hour', sub: 'Soft warm light ends', color: '#ffd06a', dot: 'golden' as const },
+    { t: sun.goldenEnd, name: 'Golden hour ends', sub: 'Soft warm light fades', color: '#ffd06a', dot: 'golden' as const },
     { t: sun.solarNoon, name: 'Solar noon', sub: 'Sun at its peak', color: '#ffe79a', dot: 'noon' as const, big: true },
-    { t: sun.goldenStart, name: 'Evening golden hour', sub: 'Soft warm light begins', color: '#ffd06a', dot: 'golden' as const },
+    { t: sun.goldenStart, name: 'Golden hour begins', sub: 'Soft warm light returns', color: '#ffd06a', dot: 'golden' as const },
     { t: sun.sunset, name: 'Sunset', sub: 'Sun crosses horizon', color: '#e87a3a', dot: 'sun' as const, big: true },
-    { t: sun.civilDusk, name: 'Civil dusk', sub: 'Last usable light', color: '#6a8aff', dot: 'civil' as const },
-    { t: sun.nauticalDusk, name: 'Nautical dusk', sub: 'Horizon fades', color: '#4a5fcf', dot: 'naut' as const },
-    { t: sun.astroDusk, name: 'Astronomical dusk', sub: 'True night begins', color: '#2a3590', dot: 'astro' as const },
+    { t: sun.civilDusk, name: 'Blue hour ends', sub: 'Last usable light', color: '#6a8aff', dot: 'civil' as const },
+    { t: sun.nauticalDusk, name: 'Twilight ends', sub: 'Horizon fades', color: '#4a5fcf', dot: 'naut' as const },
+    { t: sun.astroDusk, name: 'Last light', sub: 'True night begins', color: '#2a3590', dot: 'astro' as const },
   ];
+
+  // "NOW" attaches to the NEXT upcoming phase (the one we're heading toward).
+  // This reads naturally as "you're about to enter X" rather than "you're in X"
+  // (the old logic, which collided with multi-hour gaps like the morning).
+  const nextIdx = phases.findIndex((p) => p.t.getTime() > now);
 
   return (
     <div className="overflow-hidden rounded-xl border border-[#1b2440] bg-[#0c1428]">
       {phases.map((p, i) => {
         const tMs = p.t.getTime();
         const passed = now >= tMs;
-        const isCurrent = i < phases.length - 1 && now >= tMs && now < phases[i + 1].t.getTime();
+        const isNext = i === nextIdx;
         return (
           <div
             key={i}
-            className={`flex min-h-[36px] items-center gap-2.5 border-b border-[#131a2e] px-3 py-2 last:border-b-0 ${passed && !isCurrent ? 'opacity-55' : ''}`}
+            className={`flex min-h-[36px] items-center gap-2.5 border-b border-[#131a2e] px-3 py-2 last:border-b-0 ${passed ? 'opacity-55' : ''}`}
           >
             <div className="w-11 font-mono text-[12px] font-semibold tabular-nums text-neutral-50">{fmtTime(p.t, tz)}</div>
             <PhaseDot kind={p.dot} color={p.color} />
@@ -251,10 +265,44 @@ function PhaseList({ sun, now, tz }: { sun: SunPhases; now: number; tz: string }
               <div className={`text-[13px] leading-tight ${p.big ? 'font-semibold text-neutral-50' : 'font-medium text-neutral-200'}`}>{p.name}</div>
               <div className="mt-px text-[10px] text-[#7a8aa3]">{p.sub}</div>
             </div>
-            {isCurrent && <div className="rounded-sm bg-[#ffd06a] px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-wider text-[#0a0a0a]">NOW</div>}
+            {isNext && <div className="rounded-sm bg-[#ffd06a] px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-wider text-[#0a0a0a]">NEXT</div>}
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * Countdown to the next sunrise or sunset. If between them: shows "Sunset in 7h
+ * 12m". Pre-dawn: "Sunrise in 5h 02m". Post-dusk: "Sunrise tomorrow in 7h 30m".
+ */
+function NextEventBar({ sun, now, tz }: { sun: SunPhases; now: number; tz: string }) {
+  const sr = sun.sunrise.getTime();
+  const ss = sun.sunset.getTime();
+  let label: string;
+  let when: Date;
+  let remainMs: number;
+  if (now < sr) { label = 'Sunrise'; when = sun.sunrise; remainMs = sr - now; }
+  else if (now < ss) { label = 'Sunset'; when = sun.sunset; remainMs = ss - now; }
+  else {
+    // Approximate next sunrise as today's sunrise + 24h. Suncalc's day-level
+    // values are anchored to UTC midday so this is accurate within ~30s for
+    // the next-day display.
+    when = new Date(sr + 24 * 3600_000);
+    label = 'Sunrise';
+    remainMs = when.getTime() - now;
+  }
+  return (
+    <div className="mx-3.5 mt-2 flex items-center justify-between rounded-xl border border-[#1b2440] bg-[#101a32] px-3.5 py-2.5">
+      <div className="flex flex-col">
+        <div className="font-mono text-[10px] font-bold uppercase tracking-[1px] text-[#7a8aa3]">{label} in</div>
+        <div className="mt-0.5 font-mono text-[20px] font-medium tabular-nums leading-none text-neutral-50">{fmtDur(remainMs)}</div>
+      </div>
+      <div className="flex flex-col items-end">
+        <div className="font-mono text-[10px] font-bold uppercase tracking-[1px] text-[#7a8aa3]">at</div>
+        <div className="mt-0.5 font-mono text-[18px] font-medium tabular-nums leading-none text-[#ffd06a]">{fmtTime(when, tz)}</div>
+      </div>
     </div>
   );
 }

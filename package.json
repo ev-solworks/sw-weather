@@ -11,15 +11,25 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@bybas/weather-icons": "^2.0.0",
     "@tailwindcss/vite": "^4.2.4",
+    "d3-array": "^3.2.4",
+    "d3-scale": "^4.0.2",
+    "d3-shape": "^3.2.0",
+    "d3-time-format": "^4.1.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "suncalc": "^1.9.0",
     "tailwindcss": "^4.2.4",
+    "vercel": "^54.5.1",
     "vite-plugin-pwa": "^1.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/d3-array": "^3.2.2",
+    "@types/d3-scale": "^4.0.9",
+    "@types/d3-shape": "^3.1.8",
+    "@types/d3-time-format": "^4.0.3",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -29,6 +39,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
+    "playwright": "^1.60.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.10"
