@@ -19,10 +19,20 @@ export function RainNowcastBanner({ nowcast }: Props) {
   const event = nowcast ? computeRainEvent(nowcast) : null;
   if (!event) return null;
 
+  // Atmospheric: thin top accent stripe in sky-300 + 6% translucent fill,
+  // so the banner reads as part of the atmosphere rather than a hard box.
+  const accent = event.kind === 'start' ? '#7dd3fc' : '#86efac';
   return (
-    <div className={`flex shrink-0 items-center gap-2 px-3 py-1.5 text-[12px] ${event.kind === 'start' ? 'bg-sky-900/40 text-sky-200' : 'bg-emerald-900/40 text-emerald-200'}`}>
+    <div
+      className="relative flex shrink-0 items-center gap-2 px-3 py-1.5 text-[12px] backdrop-blur-sm"
+      style={{ background: 'rgba(255,255,255,0.06)', color: accent }}
+    >
+      <span
+        aria-hidden
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, background: accent, opacity: 0.85 }}
+      />
       <RainGlyph />
-      <span className="font-medium">{event.text}</span>
+      <span className="font-medium" style={{ color: '#e6f4ff' }}>{event.text}</span>
     </div>
   );
 }

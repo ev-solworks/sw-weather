@@ -30,13 +30,16 @@ export function HistoryChip({ weather }: Props) {
   const diff = todayHi - last.tempMax;
   const arrow = diff > 1 ? '↑' : diff < -1 ? '↓' : '→';
   const rainNote = last.rainMm >= 0.5 ? ` · rained ${last.rainMm}mm` : '';
+  // Atmospheric restyle: no card chrome. Inline row, hairline separates it
+  // from the daylight arc above (the Hair sits in TodayVisual).
+  const trendColor = diff > 1 ? '#fca5a5' : diff < -1 ? '#86efac' : 'rgba(255,255,255,0.65)';
   return (
-    <div className="mx-3.5 mb-2 mt-1 flex items-center gap-1.5 rounded-lg border border-[#1b2440] bg-[#0c1428] px-3 py-1.5 text-[11px] text-neutral-400">
-      <span className="font-mono text-[9px] font-bold tracking-[1px] text-[#7a8aa3]">LAST YEAR</span>
-      <span className="font-mono tabular-nums text-neutral-300">
+    <div className="flex items-center gap-2 px-[18px] py-2 text-[11px]" style={{ color: 'rgba(255,255,255,0.78)' }}>
+      <span className="font-mono text-[9px] font-semibold tracking-[1.4px]" style={{ color: 'rgba(255,255,255,0.45)' }}>LAST YEAR</span>
+      <span className="font-mono tabular-nums" style={{ color: 'rgba(255,255,255,0.92)' }}>
         {last.tempMax}° / {last.tempMin}°{rainNote}
       </span>
-      <span className="ml-auto font-mono tabular-nums text-neutral-500">
+      <span className="ml-auto font-mono tabular-nums font-medium" style={{ color: trendColor }}>
         {arrow} {diff >= 0 ? '+' : ''}{diff}°
       </span>
     </div>

@@ -34,14 +34,14 @@ function isTag(s: Annotation['icon']): s is WxTag {
 }
 
 function Chip({ a }: { a: Annotation }) {
+  // Atmospheric restyle: drop card chrome. Urgent keeps an amber tint; the
+  // rest sit naked on the sky with just an icon + text.
   const style =
     a.kind === 'urgent'
-      ? 'bg-amber-900/40 text-amber-100 border border-amber-700/40'
-      : a.kind === 'info'
-        ? 'bg-[#121b2c] text-neutral-200 border border-[#1d2533]'
-        : 'bg-transparent text-neutral-400 border border-[#1b2440]';
+      ? 'text-amber-100 bg-amber-900/30 border border-amber-700/30'
+      : 'text-white/90 bg-white/[0.05] border border-white/[0.08]';
   return (
-    <div className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full py-1 pl-1.5 pr-2.5 text-[11.5px] ${style}`}>
+    <div className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full py-1 pl-1.5 pr-2.5 text-[11.5px] backdrop-blur-sm ${style}`}>
       {a.icon && (
         isTag(a.icon)
           ? <WxTagIcon tag={a.icon} size={18} />
