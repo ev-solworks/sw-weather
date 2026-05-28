@@ -1,0 +1,12 @@
+# Vercel-only ignore. Build is run on Vercel from sources; ship nothing else.
+.planning/
+.claude/
+docs/
+edge/
+design_handoff_sw_weather/
+node_modules/
+dist/
+*.log
+.env
+.env.local
+.DS_Store
