@@ -11,6 +11,7 @@ import { TodayVisual } from '@/views/TodayVisual';
 import { TodaySun } from '@/views/TodaySun';
 import { TodayWindguru } from '@/views/TodayWindguru';
 import { TodayGraph } from '@/views/TodayGraph';
+import { TodayMap } from '@/views/TodayMap';
 import { LocationSwitcher } from '@/components/LocationSwitcher';
 
 const SUB_VIEWS: { key: TodaySubView; label: string; enabled: boolean }[] = [
@@ -18,6 +19,7 @@ const SUB_VIEWS: { key: TodaySubView; label: string; enabled: boolean }[] = [
   { key: 'windguru', label: 'Detail', enabled: true },
   { key: 'graph', label: 'Graph', enabled: true },
   { key: 'sun', label: 'Sun', enabled: true },
+  { key: 'map', label: 'Map', enabled: true },
 ];
 
 export function TodayView() {
@@ -47,7 +49,7 @@ export function TodayView() {
         ))}
       </div>
 
-      <div className={`min-h-0 flex-1 ${todaySub === 'windguru' || todaySub === 'graph' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+      <div className={`min-h-0 flex-1 ${todaySub === 'windguru' || todaySub === 'graph' || todaySub === 'map' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
         {loading && !data && <Centered>Loading {activeLocation.name}…</Centered>}
         {error && !data && <Centered>Couldn’t load weather — {error}</Centered>}
         {data && (
@@ -61,6 +63,7 @@ export function TodayView() {
             {todaySub === 'sun' && <TodaySun weather={data} />}
             {todaySub === 'windguru' && <TodayWindguru weather={data} />}
             {todaySub === 'graph' && <TodayGraph weather={data} />}
+            {todaySub === 'map' && <TodayMap weather={data} />}
           </>
         )}
       </div>
