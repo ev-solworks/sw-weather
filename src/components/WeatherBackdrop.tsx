@@ -123,13 +123,14 @@ export function WeatherBackdrop({ desc, hour }: WeatherBackdropProps) {
       className="absolute inset-0 overflow-hidden"
       style={{ pointerEvents: 'none', background: p.top }}
     >
-      {/* 1. Painterly sky image — covers the whole backdrop, top-aligned so
-             the brightest part hits the hero. */}
+      {/* 1. Painterly sky image — covers the whole backdrop. Top-aligned so
+             the brightest part of the sky hits the hero zone (upper half).
+             Image hosts the sun/moon/stars/clouds; we lean on it for atmosphere. */}
       <img
         src={imgSrc}
         alt=""
         className="absolute inset-0 h-full w-full"
-        style={{ objectFit: 'cover', objectPosition: 'top center' }}
+        style={{ objectFit: 'cover', objectPosition: '50% 0%' }}
         loading="eager"
         decoding="async"
       />

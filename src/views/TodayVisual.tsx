@@ -126,8 +126,24 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
         </div>
       </div>
 
+      {/* ── Data wash — a low-key dark veil behind the lower content so
+            hourly + metric labels stay legible regardless of where the
+            painterly sky's brightest band falls. Translates with the column
+            wrapper so it covers Hourly → Daylight without touching the hero. */}
+      <div className="relative" style={{ marginTop: 4 }}>
+        <div
+          aria-hidden
+          className="absolute inset-x-0 -top-2 bottom-0"
+          style={{
+            background: 'linear-gradient(180deg, rgba(8,12,24,0) 0%, rgba(8,12,24,0.35) 18%, rgba(8,12,24,0.55) 100%)',
+            backdropFilter: 'blur(2px)',
+            WebkitBackdropFilter: 'blur(2px)',
+            pointerEvents: 'none',
+          }}
+        />
+
       {/* ── Hourly strip ───────────────────────────────────────── */}
-      <div className="px-3 pt-2">
+      <div className="relative px-3 pt-2">
         <div className="px-1 pb-1 font-mono text-[9px] font-semibold tracking-[2.2px]" style={{ color: fgXLo }}>
           NEXT 12 HOURS
         </div>
@@ -180,7 +196,7 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
 
       {/* ── 3 metric columns — no cards, hairlines above/below ── */}
       <Hair mt={10} />
-      <div className="grid grid-cols-3 px-0 py-3">
+      <div className="relative grid grid-cols-3 px-0 py-3">
         <MetricCol fg={fg} fgLo={fgLo} fgXLo={fgXLo} label="Wind" value={`${current.windSpeed}`} unit={`km/h ${compass(current.windDirection)}`} live={weather.sources.wind?.source === 'oceandrivers'} align="flex-start" pad={18} onTap={() => setDetailMetric('wind')} />
         <MetricCol fg={fg} fgLo={fgLo} fgXLo={fgXLo} label="Humidity" value={`${current.humidity}`} unit="%" align="center" onTap={() => setDetailMetric('humidity')} />
         <MetricCol fg={fg} fgLo={fgLo} fgXLo={fgXLo} label="UV" value={`${uv}`} unit={uvLabel(uv)} align="flex-end" pad={18} onTap={() => setDetailMetric('uv')} />
@@ -188,10 +204,13 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
 
       {/* ── Daylight arc — no card, hairline above ─────────────── */}
       <Hair />
-      <SunArc sunrise={sun.sunrise} sunset={sun.sunset} tz={tz} nowMs={nowMs} fg={fg} fgLo={fgLo} fgXLo={fgXLo} fgXXLo={fgXXLo} />
+      <div className="relative">
+        <SunArc sunrise={sun.sunrise} sunset={sun.sunset} tz={tz} nowMs={nowMs} fg={fg} fgLo={fgLo} fgXLo={fgXLo} fgXXLo={fgXXLo} />
+      </div>
 
       {/* Bottom safe-area spacer so the last row clears the tab bar */}
       <div style={{ height: 24 }} />
+      </div>{/* end data-wash wrapper */}
 
       {/* Drilldown overlay */}
       {detailMetric && (
