@@ -1,25 +1,20 @@
 /**
- * WeatherBackdrop — atmospheric full-bleed sky.
+ * WeatherBackdrop — atmospheric image-based sky.
  *
- * Restyled per design_handoff_atmospheric_restyle/. Composition back→front:
- *   1. Base 3-stop vertical gradient — luminous all the way down (no fade to
- *      near-black). Palette varies by ConditionCode AND local hour (day/dawn/
- *      golden/night variants).
- *   2. Atmospheric glow + sun disc (clear daytime) OR moon + 32 stars
- *      (clear/partly nights), positioned by hour.
- *   3. Cloud layers (cloudy / partly / rain).
- *   4. Rain streaks (rain / heavy rain).
- *   5. Soft bottom vignette (per-condition opacity) for foreground legibility.
- *   6. Soft side vignette for edges.
- *   7. Film grain (SVG turbulence at 6% on overlay).
- *
- * Designed to render at full screen behind the entire Today view, including
- * the iOS status bar area. The `fullBleed` prop is on by default; pass false
- * to use the older 342px hero-only behaviour.
+ * Composition (back → front):
+ *   1. Per-condition × hour painterly WebP image (8-20 KB each, served from
+ *      /public/sky/). Carries the sun, moon, stars, clouds, rain visuals in
+ *      a way procedural CSS never could.
+ *   2. Graduated dark wash from upper half down so the content area always
+ *      sits on a near-solid dark surface (legibility guarantee).
+ *   3. Side vignette.
+ *   4. Film grain overlay (~6% opacity, mix-blend overlay).
  *
  * Exports `atmPalette()` so the lower content panel can color text from the
  * sky's foreground value (atmospheric `fg`) — keeps everything chromatically
  * keyed to the current condition.
+ *
+ * Drop the procedural sun / moon / star / cloud / rain layers — image owns them.
  */
 
 import type { ConditionCode } from '@/types/weather';
@@ -31,16 +26,16 @@ export interface AtmPalette {
   bottom: string;
   /** Foreground text color, derived from the sky so text stays readable. */
   fg: string;
-  /** Glow tint for the sun / moon disc. */
+  /** Glow tint, kept for callers (sun arc etc.) that still need an accent. */
   glow: string;
 }
 
 /**
  * Per-condition × hour-of-day palette. Hour bands:
- *   • night: <6 or >=20  → deep blues, low chroma
- *   • dawn:  5–8         → muted lavender + warm peach
- *   • dusk:  17–20       → magenta + amber
- *   • day:   8–17        → blue + warm white
+ *   • night: <6 or >=20
+ *   • dawn:  5–8
+ *   • dusk:  17–20
+ *   • day:   8–17
  * The fg color is the literal text color to use on top of this sky.
  */
 export function atmPalette(desc: ConditionCode, hour: number): AtmPalette {
@@ -48,7 +43,6 @@ export function atmPalette(desc: ConditionCode, hour: number): AtmPalette {
   const dusk  = hour >= 17 && hour < 20;
   const dawn  = hour >= 5 && hour < 8;
 
-  // Clear / Sunny family
   if (desc === 'Clear' || desc === 'Sunny' || desc === 'Mostly clear' || desc === 'Mostly sunny') {
     if (night) return { top: '#0a1428', mid: '#1a2a4a', bottom: '#2d3a5e', fg: '#e8e9f0', glow: 'rgba(255,240,200,0.4)' };
     if (dusk)  return { top: '#3a3060', mid: '#a45a55', bottom: '#e89968', fg: '#fbf1de', glow: 'rgba(255,180,120,0.7)' };
@@ -81,196 +75,67 @@ export function atmPalette(desc: ConditionCode, hour: number): AtmPalette {
   return { top: '#2a3550', mid: '#5a6e8c', bottom: '#9aabbe', fg: '#fafbfc', glow: 'rgba(255,255,255,0.4)' };
 }
 
-/** Darken a #rrggbb hex by `amount` (0–1). Used to chain the base gradient
- * into a deep dark surface below the sky. */
-function darkenHex(hex: string, amount: number): string {
-  const c = hex.replace('#', '');
-  const r = parseInt(c.slice(0, 2), 16);
-  const g = parseInt(c.slice(2, 4), 16);
-  const b = parseInt(c.slice(4, 6), 16);
-  const t = (v: number) => Math.max(0, Math.min(255, Math.round(v * (1 - amount))));
-  return `rgb(${t(r)}, ${t(g)}, ${t(b)})`;
+/**
+ * Pick the painterly WebP for the given condition × hour.
+ * Mirrors atmPalette's hour bands but maps to a file slug.
+ */
+function skyImagePath(desc: ConditionCode, hour: number): string {
+  const night = hour < 6 || hour >= 20;
+  const dusk  = hour >= 17 && hour < 20;
+  const dawn  = hour >= 5 && hour < 8;
+
+  if (desc === 'Clear' || desc === 'Sunny' || desc === 'Mostly clear' || desc === 'Mostly sunny') {
+    if (night) return '/sky/clear-night.webp';
+    if (dusk)  return '/sky/clear-dusk.webp';
+    if (dawn)  return '/sky/clear-dawn.webp';
+    return '/sky/clear-day.webp';
+  }
+  if (desc === 'Partly cloudy') {
+    return night ? '/sky/partly-night.webp' : '/sky/partly-day.webp';
+  }
+  if (desc === 'Cloudy') {
+    return night ? '/sky/cloudy-night.webp' : '/sky/cloudy-day.webp';
+  }
+  if (desc === 'Heavy rain' || desc === 'Thunder') return '/sky/heavy-rain.webp';
+  if (desc === 'Rain' || desc === 'Light rain')   return '/sky/rain.webp';
+  if (desc === 'Fog' || desc === 'Haze')          return '/sky/fog.webp';
+  if (desc === 'Snow')                            return '/sky/cloudy-day.webp'; // fallback until snow image exists
+  return '/sky/cloudy-day.webp';
 }
 
-// Film grain — inline SVG turbulence, base64-free for cleanliness.
 const GRAIN_URL =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
 
 interface WeatherBackdropProps {
   desc: ConditionCode;
   hour: number;
-  /** When true (default), no max-height — fills the parent. When false the
-   * component returns a 342px-height hero. */
   fullBleed?: boolean;
 }
 
-export function WeatherBackdrop({ desc, hour, fullBleed = true }: WeatherBackdropProps) {
+export function WeatherBackdrop({ desc, hour }: WeatherBackdropProps) {
   const p = atmPalette(desc, hour);
   const isNight = hour < 6 || hour >= 20;
-  const isRain = desc === 'Rain' || desc === 'Light rain' || desc === 'Heavy rain' || desc === 'Thunder';
-  const isHeavy = desc === 'Heavy rain' || desc === 'Thunder';
-  const isCloudy = desc === 'Cloudy' || desc === 'Partly cloudy' || isRain;
-  const showSun = (desc === 'Clear' || desc === 'Sunny' || desc === 'Mostly sunny') && !isNight;
-  const showMoonStars = isNight && (desc === 'Clear' || desc === 'Mostly clear' || desc === 'Partly cloudy');
-  // Sun travels 14% → 69% of viewport height across hours 6–20.
-  const sunY = ((hour - 6) / 14) * 55 + 14;
+  const imgSrc = skyImagePath(desc, hour);
 
   return (
     <div
       aria-hidden
-      className={`${fullBleed ? 'absolute inset-0' : 'absolute inset-0'} overflow-hidden`}
-      style={{ pointerEvents: 'none' }}
+      className="absolute inset-0 overflow-hidden"
+      style={{ pointerEvents: 'none', background: p.top }}
     >
-      {/* 1. Base gradient — atmospheric in the upper half, deeper in the lower
-             half so text is always legible against a dark surface. */}
-      <div
-        className="absolute inset-0"
-        style={{ background: `linear-gradient(180deg, ${p.top} 0%, ${p.mid} 35%, ${p.bottom} 50%, ${darkenHex(p.bottom, 0.45)} 75%, #0a0f1c 100%)` }}
+      {/* 1. Painterly sky image — covers the whole backdrop, top-aligned so
+             the brightest part hits the hero. */}
+      <img
+        src={imgSrc}
+        alt=""
+        className="absolute inset-0 h-full w-full"
+        style={{ objectFit: 'cover', objectPosition: 'top center' }}
+        loading="eager"
+        decoding="async"
       />
 
-      {/* 2. Atmospheric glow centered on the sun's apparent position. Confined
-             to the upper half (mask via maxHeight) so bright glows can't bleed
-             into the content area below. */}
-      <div
-        className="absolute"
-        style={{
-          top: 0, left: 0, right: 0,
-          height: '55%',
-          background: `radial-gradient(ellipse 75% 60% at 70% ${(sunY / 100) * 90}%, ${p.glow}, transparent 70%)`,
-          mixBlendMode: 'screen',
-          opacity: showSun ? 0.9 : 0.35,
-          maskImage: 'linear-gradient(180deg, black 0%, black 70%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(180deg, black 0%, black 70%, transparent 100%)',
-        }}
-      />
-
-      {/* Sun disc — only render when in the upper region (y < 50%). */}
-      {showSun && sunY < 50 && (
-        <div
-          className="absolute"
-          style={{
-            top: `${sunY}%`,
-            left: '70%',
-            width: 84,
-            height: 84,
-            transform: 'translate(-50%, -50%)',
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,250,235,0.92), rgba(255,225,170,0.32) 60%, transparent 75%)',
-            filter: 'blur(2px)',
-          }}
-        />
-      )}
-
-      {/* Moon + stars (clear/partly clear nights). Confined to upper 50% via
-          a mask so they fade out before the content area. */}
-      {showMoonStars && (
-        <div
-          className="absolute"
-          style={{
-            top: 0, left: 0, right: 0,
-            height: '50%',
-            maskImage: 'linear-gradient(180deg, black 0%, black 75%, transparent 100%)',
-            WebkitMaskImage: 'linear-gradient(180deg, black 0%, black 75%, transparent 100%)',
-          }}
-        >
-          <div
-            className="absolute"
-            style={{
-              top: '32%', left: '72%',
-              width: 60, height: 60,
-              transform: 'translate(-50%, -50%)',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(245,240,225,0.45), transparent 70%)',
-            }}
-          />
-          {Array.from({ length: 32 }).map((_, i) => {
-            const x = (i * 137.5) % 100;
-            const y = (i * 73) % 75; // limit star Y so masking does the rest
-            const s = (i % 3 === 0) ? 2 : 1;
-            return (
-              <div
-                key={i}
-                className="absolute"
-                style={{
-                  top: `${y}%`, left: `${x}%`,
-                  width: s, height: s,
-                  borderRadius: '50%',
-                  background: 'rgba(255,255,255,0.85)',
-                  boxShadow: '0 0 4px rgba(255,255,255,0.5)',
-                }}
-              />
-            );
-          })}
-        </div>
-      )}
-
-      {/* 3. Cloud layers — confined to the upper 45% so they can't pollute
-             the content area's contrast. Mask faded out by 55%. */}
-      {isCloudy && (
-        <div
-          className="absolute"
-          style={{
-            top: 0, left: 0, right: 0,
-            height: '50%',
-            maskImage: 'linear-gradient(180deg, black 0%, black 70%, transparent 100%)',
-            WebkitMaskImage: 'linear-gradient(180deg, black 0%, black 70%, transparent 100%)',
-          }}
-        >
-          <div
-            className="absolute"
-            style={{
-              top: '14%', left: '-10%',
-              width: '140%', height: '40%',
-              background: `radial-gradient(ellipse 50% 50% at 30% 50%, rgba(255,255,255,${isRain ? 0.08 : 0.18}), transparent 60%), radial-gradient(ellipse 40% 60% at 75% 30%, rgba(255,255,255,${isRain ? 0.06 : 0.15}), transparent 65%)`,
-              filter: 'blur(8px)',
-            }}
-          />
-          <div
-            className="absolute"
-            style={{
-              top: '34%', left: '-10%',
-              width: '140%', height: '40%',
-              background: `radial-gradient(ellipse 60% 40% at 60% 50%, rgba(${isRain ? '40,50,75' : '255,255,255'},${isRain ? 0.45 : 0.22}), transparent 70%)`,
-              filter: 'blur(14px)',
-            }}
-          />
-        </div>
-      )}
-
-      {/* 4. Rain streaks — top ~40% only */}
-      {isRain && (
-        <svg
-          width="100%" height="40%"
-          className="absolute top-0 left-0"
-          style={{
-            opacity: isHeavy ? 0.55 : 0.35,
-            mixBlendMode: 'screen',
-            maskImage: 'linear-gradient(180deg, black 0%, black 70%, transparent 100%)',
-            WebkitMaskImage: 'linear-gradient(180deg, black 0%, black 70%, transparent 100%)',
-          }}
-          preserveAspectRatio="none"
-        >
-          {Array.from({ length: isHeavy ? 80 : 45 }).map((_, i) => {
-            const x = (i * 47) % 100;
-            const y = (i * 31) % 100;
-            const len = 18 + (i % 6) * 4;
-            return (
-              <line
-                key={i}
-                x1={`${x}%`} y1={`${y}%`}
-                x2={`${x + 1.8}%`} y2={`${y + len / 8}%`}
-                stroke="rgba(220,235,255,0.7)"
-                strokeWidth="0.5"
-                strokeLinecap="round"
-              />
-            );
-          })}
-        </svg>
-      )}
-
-      {/* 5. Graduated dark wash — the legibility guarantee. Subtle from 38%
-             down, climbing to a near-opaque dark by 100%. Stronger on bright
-             skies (day/dawn/golden) where contrast is hardest. */}
+      {/* 2. Graduated dark wash — legibility guarantee. Subtle from 38% down,
+             climbing to a near-opaque dark by 100%. Stronger on bright skies. */}
       <div
         className="absolute inset-0"
         style={{
@@ -278,13 +143,13 @@ export function WeatherBackdrop({ desc, hour, fullBleed = true }: WeatherBackdro
         }}
       />
 
-      {/* 6. Soft side vignette */}
+      {/* 3. Side vignette */}
       <div
         className="absolute inset-0"
         style={{ background: 'radial-gradient(ellipse 110% 80% at 50% 30%, transparent 55%, rgba(0,0,0,0.18))' }}
       />
 
-      {/* 7. Film grain */}
+      {/* 4. Film grain */}
       <div
         className="absolute inset-0"
         style={{
