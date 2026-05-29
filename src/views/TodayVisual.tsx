@@ -136,9 +136,9 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
           aria-hidden
           className="absolute inset-x-0 -top-2 bottom-0"
           style={{
-            background: 'linear-gradient(180deg, rgba(8,12,24,0) 0%, rgba(8,12,24,0.35) 18%, rgba(8,12,24,0.55) 100%)',
-            backdropFilter: 'blur(2px)',
-            WebkitBackdropFilter: 'blur(2px)',
+            background: 'linear-gradient(180deg, rgba(8,12,24,0) 0%, rgba(8,12,24,0.22) 18%, rgba(8,12,24,0.38) 100%)',
+            backdropFilter: 'blur(1px)',
+            WebkitBackdropFilter: 'blur(1px)',
             pointerEvents: 'none',
           }}
         />
