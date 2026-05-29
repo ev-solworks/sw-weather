@@ -66,10 +66,9 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
   const fgLo = `${fg}cc`;
   const fgXLo = `${fg}80`;
   const fgXXLo = `${fg}55`;
-  // Stronger shadow so type stays legible even where the bright sky bleeds
-  // through the dark wash (hero region). Painterly skies have varied bright
-  // patches; shadow does the contrast lift.
-  const textShadow = '0 1px 10px rgba(0,0,0,0.55), 0 0 3px rgba(0,0,0,0.35)';
+  // No text shadow — painterly skies + dark wash do the contrast lift.
+  // Was applying a 0.55-alpha drop shadow on all type; numbers looked muddy.
+  const textShadow = 'none';
 
   return (
     <div className="flex w-full flex-col" style={{ color: fg, textShadow }}>
