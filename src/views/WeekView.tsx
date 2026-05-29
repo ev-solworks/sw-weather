@@ -20,7 +20,10 @@ export function WeekView() {
 
   return (
     <div className="flex h-full w-full flex-col bg-[#070b1a] text-neutral-200">
-      <div className="flex shrink-0 items-baseline gap-2 border-b border-[#131a2e] px-4 py-3">
+      <div
+        className="flex shrink-0 items-baseline gap-2 border-b border-[#131a2e] px-4 pb-3"
+        style={{ paddingTop: `calc(env(safe-area-inset-top, 0px) + 12px)` }}
+      >
         <span className="text-base font-semibold tracking-tight text-neutral-50">{activeLocation.name}</span>
         <span className="text-[11px] font-medium text-neutral-500">{activeLocation.region}</span>
       </div>

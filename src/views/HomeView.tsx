@@ -30,7 +30,10 @@ export function HomeView() {
 
   return (
     <div className="flex h-full w-full flex-col bg-[#0a0f1c] text-neutral-200">
-      <div className="flex shrink-0 items-start justify-between px-4 pb-1.5 pt-3">
+      <div
+        className="flex shrink-0 items-start justify-between px-4 pb-1.5"
+        style={{ paddingTop: `calc(env(safe-area-inset-top, 0px) + 12px)` }}
+      >
         <div>
           <div className="text-[22px] font-semibold tracking-tight text-neutral-50">{greet}</div>
           <div className="mt-0.5 text-xs text-neutral-500">{dateStr}</div>
@@ -115,7 +118,7 @@ function CardContent({ weather, featured }: { weather: WeatherConditions; featur
               <span>{location.name}</span>
             </div>
             <div className="mt-0.5 font-mono text-[11px] tabular-nums text-white/65">
-              {fmtTime(current.observedAt, tz)}
+              {fmtTime(new Date(), tz)}
               <span className="mx-1.5 text-white/30">·</span>
               <span className="text-white/60">{location.region}</span>
             </div>

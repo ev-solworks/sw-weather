@@ -100,7 +100,10 @@ export function WindView() {
 
   return (
     <div className="flex h-full w-full flex-col bg-[#0a0f1c] text-neutral-200">
-      <div className="flex shrink-0 items-center justify-between px-4 pb-1 pt-3">
+      <div
+        className="flex shrink-0 items-center justify-between px-4 pb-1"
+        style={{ paddingTop: `calc(env(safe-area-inset-top, 0px) + 12px)` }}
+      >
         <div className="flex items-center gap-2 text-[15px] font-semibold text-neutral-50">
           Live Wind
           <span className="flex items-center gap-1.5 font-mono text-[10px] font-semibold tracking-wider text-emerald-400">
