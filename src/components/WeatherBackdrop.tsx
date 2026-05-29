@@ -134,13 +134,12 @@ export function WeatherBackdrop({ desc, hour }: WeatherBackdropProps) {
         decoding="async"
       />
 
-      {/* 2. Light wash — the painterly skies already bake in a dark fade
-             toward the lower third, so this is just a gentle assist for
-             text contrast (no longer the legibility guarantee). */}
+      {/* 2. Featherweight wash — painterly skies own the legibility now;
+             this is just a whisper of darkening to nudge text contrast. */}
       <div
         className="absolute inset-0"
         style={{
-          background: `linear-gradient(180deg, transparent 50%, rgba(8,12,24,${isNight ? 0.15 : 0.25}) 75%, rgba(6,10,20,${isNight ? 0.3 : 0.45}) 100%)`,
+          background: `linear-gradient(180deg, transparent 60%, rgba(8,12,24,${isNight ? 0.08 : 0.12}) 80%, rgba(6,10,20,${isNight ? 0.15 : 0.22}) 100%)`,
         }}
       />
 
