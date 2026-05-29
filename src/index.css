@@ -12,7 +12,10 @@ body,
   min-height: 100svh;
   margin: 0;
   overflow-x: hidden;
-  background: #0a0a0a;
+  /* Body bg is owned by TodayView (dynamic theme-color sync) so the iOS
+     status bar / dynamic island area inherits the current sky color when
+     viewport-fit=cover is on. Default is a sensible deep blue. */
+  background: #1a1f30;
   color: #e5e7eb;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-synthesis: none;

@@ -10,7 +10,7 @@
  * Visual; otherwise neutral white.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNav, type TodaySubView } from '@/app/navigation';
 import { useWeather } from '@/hooks/useWeather';
 import { TodayVisual } from '@/views/TodayVisual';
@@ -41,6 +41,26 @@ export function TodayView() {
     ? atmPalette(data.current.description, localHour(data.current.observedAt, data.location.timezone))
     : null;
   const fg = palette?.fg ?? '#fafafa';
+
+  // Dynamic <meta name="theme-color"> + body background so the iOS status bar
+  // / dynamic island area blends with the current sky's top stop. iOS Safari
+  // and PWA-standalone both honor this for the area above the web view.
+  useEffect(() => {
+    const skyColor = palette?.top ?? '#0a0f1c';
+    let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = 'theme-color';
+      document.head.appendChild(meta);
+    }
+    meta.content = skyColor;
+    // body bg ensures the area beneath the safe-area inset (under notch /
+    // dynamic island when viewport-fit=cover is set) shows the sky color
+    // instead of falling back to the default body bg.
+    const prev = document.body.style.backgroundColor;
+    document.body.style.backgroundColor = skyColor;
+    return () => { document.body.style.backgroundColor = prev; };
+  }, [palette?.top]);
 
   return (
     <div className="relative flex h-full w-full flex-col">
