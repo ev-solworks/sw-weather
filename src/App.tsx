@@ -30,7 +30,7 @@ function CurrentView() {
 
 function Shell() {
   return (
-    <div className="mx-auto flex h-svh w-full max-w-[430px] flex-col overflow-hidden shadow-2xl">
+    <div className="mx-auto flex h-dvh w-full max-w-[430px] flex-col overflow-hidden shadow-2xl">
       <div className="min-h-0 flex-1">
         <CurrentView />
       </div>
