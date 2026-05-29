@@ -58,12 +58,13 @@ export function TodayView() {
       document.head.appendChild(meta);
     }
     meta.content = skyColor;
-    // body bg ensures the area beneath the safe-area inset (under notch /
-    // dynamic island when viewport-fit=cover is set) shows the sky color
-    // instead of falling back to the default body bg.
-    const prev = document.body.style.backgroundColor;
-    document.body.style.backgroundColor = skyColor;
-    return () => { document.body.style.backgroundColor = prev; };
+    // Split body background: top half = sky color (fills status bar / dynamic
+    // island area under viewport-fit=cover); bottom half = tab-bar dark
+    // (fills the gap under the home indicator). The web view content covers
+    // the middle either way.
+    const prev = document.body.style.background;
+    document.body.style.background = `linear-gradient(180deg, ${skyColor} 0%, ${skyColor} 50%, #0a0f1c 50%, #0a0f1c 100%)`;
+    return () => { document.body.style.background = prev; };
   }, [palette?.top]);
 
   return (

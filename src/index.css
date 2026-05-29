@@ -6,6 +6,13 @@
   color-scheme: dark;
 }
 
+/* HTML bg = tab-bar dark. iOS uses this for any safe-area pixels under the
+   home indicator if the body doesn't reach there. Prevents a body-color
+   strip below the tab bar when the layout doesn't perfectly fill the dvh. */
+html {
+  background: #0a0f1c;
+}
+
 html,
 body,
 #root {
