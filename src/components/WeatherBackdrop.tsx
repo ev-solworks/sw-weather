@@ -31,17 +31,50 @@ export interface AtmPalette {
 }
 
 /**
- * Per-condition × hour-of-day palette. Hour bands:
- *   • night: <6 or >=20
- *   • dawn:  5–8
- *   • dusk:  17–20
- *   • day:   8–17
- * The fg color is the literal text color to use on top of this sky.
+ * Sun-phase signature used to pick palette + image. When real sunrise/sunset
+ * available, callers should compute `phaseFor(now, sunrise, sunset)`. Falls
+ * back to crude hour bands when no sun data.
  */
-export function atmPalette(desc: ConditionCode, hour: number): AtmPalette {
-  const night = hour < 6 || hour >= 20;
-  const dusk  = hour >= 17 && hour < 20;
-  const dawn  = hour >= 5 && hour < 8;
+export type SunPhase = 'night' | 'dawn' | 'day' | 'dusk';
+
+/**
+ * Compute the sun phase from real sunrise/sunset times. Bands relative to
+ * sun, not the clock:
+ *   • dawn:  90 min after sunrise (low warm light)
+ *   • dusk:  90 min before sunset (golden hour → magic hour)
+ *   • night: before sunrise OR after sunset
+ *   • day:   the bulk in between
+ */
+export function phaseFor(nowMs: number, sunrise: Date, sunset: Date): SunPhase {
+  const WINDOW = 90 * 60_000;
+  const sr = sunrise.getTime();
+  const ss = sunset.getTime();
+  if (nowMs < sr || nowMs >= ss) return 'night';
+  if (nowMs < sr + WINDOW) return 'dawn';
+  if (nowMs >= ss - WINDOW) return 'dusk';
+  return 'day';
+}
+
+/** Crude hour-band fallback when no sun phase is supplied. */
+function phaseFromHour(hour: number): SunPhase {
+  if (hour < 6 || hour >= 20) return 'night';
+  if (hour >= 5 && hour < 8) return 'dawn';
+  if (hour >= 17 && hour < 20) return 'dusk';
+  return 'day';
+}
+
+/**
+ * Per-condition × sun-phase palette. The fg color is the literal text color
+ * to use on top of this sky.
+ *
+ * If `phase` omitted, falls back to hour-band inference (for callers that
+ * don't have sun data yet).
+ */
+export function atmPalette(desc: ConditionCode, hour: number, phase?: SunPhase): AtmPalette {
+  const ph = phase ?? phaseFromHour(hour);
+  const night = ph === 'night';
+  const dusk  = ph === 'dusk';
+  const dawn  = ph === 'dawn';
 
   if (desc === 'Clear' || desc === 'Sunny' || desc === 'Mostly clear' || desc === 'Mostly sunny') {
     if (night) return { top: '#0a1428', mid: '#1a2a4a', bottom: '#2d3a5e', fg: '#e8e9f0', glow: 'rgba(255,240,200,0.4)' };
@@ -76,13 +109,14 @@ export function atmPalette(desc: ConditionCode, hour: number): AtmPalette {
 }
 
 /**
- * Pick the painterly WebP for the given condition × hour.
- * Mirrors atmPalette's hour bands but maps to a file slug.
+ * Pick the painterly WebP for the given condition + sun phase. If `phase`
+ * omitted, falls back to hour-band inference.
  */
-function skyImagePath(desc: ConditionCode, hour: number): string {
-  const night = hour < 6 || hour >= 20;
-  const dusk  = hour >= 17 && hour < 20;
-  const dawn  = hour >= 5 && hour < 8;
+function skyImagePath(desc: ConditionCode, hour: number, phase?: SunPhase): string {
+  const ph = phase ?? phaseFromHour(hour);
+  const night = ph === 'night';
+  const dusk  = ph === 'dusk';
+  const dawn  = ph === 'dawn';
 
   if (desc === 'Clear' || desc === 'Sunny' || desc === 'Mostly clear' || desc === 'Mostly sunny') {
     if (night) return '/sky/clear-night.webp';
@@ -109,13 +143,17 @@ const GRAIN_URL =
 interface WeatherBackdropProps {
   desc: ConditionCode;
   hour: number;
+  /** Optional sun phase — when supplied, palette + image select on this
+   * instead of clock-hour bands. Use phaseFor(nowMs, sunrise, sunset). */
+  phase?: SunPhase;
   fullBleed?: boolean;
 }
 
-export function WeatherBackdrop({ desc, hour }: WeatherBackdropProps) {
-  const p = atmPalette(desc, hour);
-  const isNight = hour < 6 || hour >= 20;
-  const imgSrc = skyImagePath(desc, hour);
+export function WeatherBackdrop({ desc, hour, phase }: WeatherBackdropProps) {
+  const p = atmPalette(desc, hour, phase);
+  const ph = phase ?? phaseFromHour(hour);
+  const isNight = ph === 'night';
+  const imgSrc = skyImagePath(desc, hour, phase);
 
   return (
     <div

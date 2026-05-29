@@ -23,7 +23,7 @@ import { WxIcon } from '@/components/WxIcon';
 import { MetricDetail, type MetricKey } from '@/components/MetricDetail';
 import { RainNowcastBanner } from '@/components/RainNowcastBanner';
 import { AnnotationStrip } from '@/components/AnnotationStrip';
-import { atmPalette } from '@/components/WeatherBackdrop';
+import { atmPalette, phaseFor } from '@/components/WeatherBackdrop';
 import { compass, fmtDuration, fmtTime, localHour, uvLabel } from '@/utils/format';
 
 function nearestHourIndex(hours: { time: Date }[], now: number): number {
@@ -60,7 +60,8 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
 
   // Atmospheric palette drives all text + accent colors so the type tones
   // shift with the sky (warm peach at golden hour, cool white midday, etc.).
-  const p = atmPalette(current.description, heroHour);
+  const phase = phaseFor(nowMs, sun.sunrise, sun.sunset);
+  const p = atmPalette(current.description, heroHour, phase);
   const fg = p.fg;
   const fgLo = `${fg}cc`;
   const fgXLo = `${fg}80`;

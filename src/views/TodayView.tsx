@@ -19,7 +19,7 @@ import { TodayWindguru } from '@/views/TodayWindguru';
 import { TodayGraph } from '@/views/TodayGraph';
 import { TodayMap } from '@/views/TodayMap';
 import { LocationSwitcher } from '@/components/LocationSwitcher';
-import { WeatherBackdrop, atmPalette } from '@/components/WeatherBackdrop';
+import { WeatherBackdrop, atmPalette, phaseFor } from '@/components/WeatherBackdrop';
 import { localHour } from '@/utils/format';
 
 const SUB_VIEWS: { key: TodaySubView; label: string; enabled: boolean }[] = [
@@ -36,9 +36,13 @@ export function TodayView() {
   const [switcherOpen, setSwitcherOpen] = useState(false);
 
   const onVisual = todaySub === 'visual';
-  // Foreground color for tabs comes from the sky palette when Visual is active.
+  // Sun-phase derived from real sunrise/sunset, not a clock-hour heuristic.
+  // This avoids "golden hour" appearing at 17:00 when sunset is 21:00.
+  const phase = data && onVisual
+    ? phaseFor(Date.now(), data.sun.sunrise, data.sun.sunset)
+    : undefined;
   const palette = data && onVisual
-    ? atmPalette(data.current.description, localHour(data.current.observedAt, data.location.timezone))
+    ? atmPalette(data.current.description, localHour(data.current.observedAt, data.location.timezone), phase)
     : null;
   const fg = palette?.fg ?? '#fafafa';
 
@@ -70,6 +74,7 @@ export function TodayView() {
           <WeatherBackdrop
             desc={data.current.description}
             hour={localHour(data.current.observedAt, data.location.timezone)}
+            phase={phase}
             fullBleed
           />
         </div>
