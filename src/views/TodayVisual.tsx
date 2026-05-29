@@ -65,7 +65,9 @@ export function TodayVisual({ weather, onOpenSwitcher }: { weather: WeatherCondi
   const fgLo = `${fg}cc`;
   const fgXLo = `${fg}80`;
   const fgXXLo = `${fg}55`;
-  const textShadow = '0 1px 6px rgba(0,0,0,0.18)';
+  // Stronger shadow so type stays legible even where the bright sky bleeds
+  // through the dark wash (hero region).
+  const textShadow = '0 1px 8px rgba(0,0,0,0.45), 0 0 2px rgba(0,0,0,0.25)';
 
   return (
     <div className="flex w-full flex-col" style={{ color: fg, textShadow }}>

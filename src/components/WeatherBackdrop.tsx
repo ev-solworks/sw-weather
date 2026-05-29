@@ -81,6 +81,17 @@ export function atmPalette(desc: ConditionCode, hour: number): AtmPalette {
   return { top: '#2a3550', mid: '#5a6e8c', bottom: '#9aabbe', fg: '#fafbfc', glow: 'rgba(255,255,255,0.4)' };
 }
 
+/** Darken a #rrggbb hex by `amount` (0–1). Used to chain the base gradient
+ * into a deep dark surface below the sky. */
+function darkenHex(hex: string, amount: number): string {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.slice(0, 2), 16);
+  const g = parseInt(c.slice(2, 4), 16);
+  const b = parseInt(c.slice(4, 6), 16);
+  const t = (v: number) => Math.max(0, Math.min(255, Math.round(v * (1 - amount))));
+  return `rgb(${t(r)}, ${t(g)}, ${t(b)})`;
+}
+
 // Film grain — inline SVG turbulence, base64-free for cleanliness.
 const GRAIN_URL =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
@@ -110,24 +121,31 @@ export function WeatherBackdrop({ desc, hour, fullBleed = true }: WeatherBackdro
       className={`${fullBleed ? 'absolute inset-0' : 'absolute inset-0'} overflow-hidden`}
       style={{ pointerEvents: 'none' }}
     >
-      {/* 1. Base gradient — luminous from top to bottom */}
+      {/* 1. Base gradient — atmospheric in the upper half, deeper in the lower
+             half so text is always legible against a dark surface. */}
       <div
         className="absolute inset-0"
-        style={{ background: `linear-gradient(180deg, ${p.top} 0%, ${p.mid} 50%, ${p.bottom} 100%)` }}
+        style={{ background: `linear-gradient(180deg, ${p.top} 0%, ${p.mid} 35%, ${p.bottom} 50%, ${darkenHex(p.bottom, 0.45)} 75%, #0a0f1c 100%)` }}
       />
 
-      {/* 2. Atmospheric glow centered on the sun's apparent position */}
+      {/* 2. Atmospheric glow centered on the sun's apparent position. Confined
+             to the upper half (mask via maxHeight) so bright glows can't bleed
+             into the content area below. */}
       <div
-        className="absolute inset-0"
+        className="absolute"
         style={{
-          background: `radial-gradient(ellipse 75% 38% at 70% ${sunY}%, ${p.glow}, transparent 70%)`,
+          top: 0, left: 0, right: 0,
+          height: '55%',
+          background: `radial-gradient(ellipse 75% 60% at 70% ${(sunY / 100) * 90}%, ${p.glow}, transparent 70%)`,
           mixBlendMode: 'screen',
-          opacity: showSun ? 1 : 0.4,
+          opacity: showSun ? 0.9 : 0.35,
+          maskImage: 'linear-gradient(180deg, black 0%, black 70%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(180deg, black 0%, black 70%, transparent 100%)',
         }}
       />
 
-      {/* Sun disc */}
-      {showSun && (
+      {/* Sun disc — only render when in the upper region (y < 50%). */}
+      {showSun && sunY < 50 && (
         <div
           className="absolute"
           style={{
@@ -143,14 +161,22 @@ export function WeatherBackdrop({ desc, hour, fullBleed = true }: WeatherBackdro
         />
       )}
 
-      {/* Moon + stars (clear/partly clear nights). 32 stars at deterministic
-          positions so they don't dance on re-render. */}
+      {/* Moon + stars (clear/partly clear nights). Confined to upper 50% via
+          a mask so they fade out before the content area. */}
       {showMoonStars && (
-        <>
+        <div
+          className="absolute"
+          style={{
+            top: 0, left: 0, right: 0,
+            height: '50%',
+            maskImage: 'linear-gradient(180deg, black 0%, black 75%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(180deg, black 0%, black 75%, transparent 100%)',
+          }}
+        >
           <div
             className="absolute"
             style={{
-              top: '18%', left: '72%',
+              top: '32%', left: '72%',
               width: 60, height: 60,
               transform: 'translate(-50%, -50%)',
               borderRadius: '50%',
@@ -159,7 +185,7 @@ export function WeatherBackdrop({ desc, hour, fullBleed = true }: WeatherBackdro
           />
           {Array.from({ length: 32 }).map((_, i) => {
             const x = (i * 137.5) % 100;
-            const y = (i * 73) % 60;
+            const y = (i * 73) % 75; // limit star Y so masking does the rest
             const s = (i % 3 === 0) ? 2 : 1;
             return (
               <div
@@ -175,17 +201,26 @@ export function WeatherBackdrop({ desc, hour, fullBleed = true }: WeatherBackdro
               />
             );
           })}
-        </>
+        </div>
       )}
 
-      {/* 3. Cloud layers — soft blurred ellipses, two depths */}
+      {/* 3. Cloud layers — confined to the upper 45% so they can't pollute
+             the content area's contrast. Mask faded out by 55%. */}
       {isCloudy && (
-        <>
+        <div
+          className="absolute"
+          style={{
+            top: 0, left: 0, right: 0,
+            height: '50%',
+            maskImage: 'linear-gradient(180deg, black 0%, black 70%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(180deg, black 0%, black 70%, transparent 100%)',
+          }}
+        >
           <div
             className="absolute"
             style={{
-              top: '12%', left: '-10%',
-              width: '140%', height: '30%',
+              top: '14%', left: '-10%',
+              width: '140%', height: '40%',
               background: `radial-gradient(ellipse 50% 50% at 30% 50%, rgba(255,255,255,${isRain ? 0.08 : 0.18}), transparent 60%), radial-gradient(ellipse 40% 60% at 75% 30%, rgba(255,255,255,${isRain ? 0.06 : 0.15}), transparent 65%)`,
               filter: 'blur(8px)',
             }}
@@ -193,21 +228,26 @@ export function WeatherBackdrop({ desc, hour, fullBleed = true }: WeatherBackdro
           <div
             className="absolute"
             style={{
-              top: '30%', left: '-10%',
-              width: '140%', height: '30%',
+              top: '34%', left: '-10%',
+              width: '140%', height: '40%',
               background: `radial-gradient(ellipse 60% 40% at 60% 50%, rgba(${isRain ? '40,50,75' : '255,255,255'},${isRain ? 0.45 : 0.22}), transparent 70%)`,
               filter: 'blur(14px)',
             }}
           />
-        </>
+        </div>
       )}
 
-      {/* 4. Rain streaks — upper half only */}
+      {/* 4. Rain streaks — top ~40% only */}
       {isRain && (
         <svg
-          width="100%" height="55%"
+          width="100%" height="40%"
           className="absolute top-0 left-0"
-          style={{ opacity: isHeavy ? 0.6 : 0.4, mixBlendMode: 'screen' }}
+          style={{
+            opacity: isHeavy ? 0.55 : 0.35,
+            mixBlendMode: 'screen',
+            maskImage: 'linear-gradient(180deg, black 0%, black 70%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(180deg, black 0%, black 70%, transparent 100%)',
+          }}
           preserveAspectRatio="none"
         >
           {Array.from({ length: isHeavy ? 80 : 45 }).map((_, i) => {
@@ -228,19 +268,20 @@ export function WeatherBackdrop({ desc, hour, fullBleed = true }: WeatherBackdro
         </svg>
       )}
 
-      {/* 5. Bottom vignette — stronger for light skies (need a wash), softer
-             for dark/heavy/night (already low-key). */}
+      {/* 5. Graduated dark wash — the legibility guarantee. Subtle from 38%
+             down, climbing to a near-opaque dark by 100%. Stronger on bright
+             skies (day/dawn/golden) where contrast is hardest. */}
       <div
         className="absolute inset-0"
         style={{
-          background: `linear-gradient(180deg, transparent 55%, rgba(0,0,0,${isNight || isHeavy ? 0.22 : 0.32}) 100%)`,
+          background: `linear-gradient(180deg, transparent 38%, rgba(8,12,24,${isNight ? 0.3 : 0.55}) 60%, rgba(6,10,20,${isNight ? 0.55 : 0.78}) 80%, rgba(6,10,20,${isNight ? 0.75 : 0.92}) 100%)`,
         }}
       />
 
       {/* 6. Soft side vignette */}
       <div
         className="absolute inset-0"
-        style={{ background: 'radial-gradient(ellipse 110% 80% at 50% 45%, transparent 60%, rgba(0,0,0,0.14))' }}
+        style={{ background: 'radial-gradient(ellipse 110% 80% at 50% 30%, transparent 55%, rgba(0,0,0,0.18))' }}
       />
 
       {/* 7. Film grain */}
