@@ -3,9 +3,11 @@
 // providers' update cadence (see pg_cron schedule). Processes locations
 // SEQUENTIALLY to stay gentle on AEMET (which hangs under concurrency).
 //
-// Also feeds the archive tables (forecast_archive, observation_archive) for
-// per-model accuracy scoring — multi-model OM fan-out happens here so each
-// hourly tick captures what every model said for the next 48h.
+// It used to also feed the archive tables (forecast_archive, observation_archive)
+// for per-model accuracy scoring. Paused 2026-10-01 (Enrique): nothing reads
+// them and the writes + nightly sweep were draining the shared project's Disk
+// IO budget. Flip ARCHIVE_ENABLED back on (and re-schedule
+// archive-retention-nightly) if the model-accuracy features are built.
 //
 // Secured by a shared secret header (REFRESH_SECRET) so only the cron can invoke
 // it — pg_cron passes it; the public can't trigger refreshes.
@@ -19,6 +21,8 @@ import {
   oceanDriversLiveToObsRow, omMultiToForecastRows,
   type ForecastRow, type ObservationRow,
 } from '../_shared/archive.ts';
+
+const ARCHIVE_ENABLED = false;
 
 Deno.serve(async (req) => {
   const secret = Deno.env.get('REFRESH_SECRET');
@@ -46,6 +50,11 @@ Deno.serve(async (req) => {
         .map(([kind, payload]) => ({ location_id: loc.id, kind, payload, fetched_at: new Date().toISOString() }));
       if (upserts.length) {
         await supabase.from('weather_cache').upsert(upserts, { onConflict: 'location_id,kind' });
+      }
+
+      if (!ARCHIVE_ENABLED) {
+        results[loc.id] = { cached: upserts.length, forecast_rows: 0, obs_rows: 0 };
+        continue;
       }
 
       // ── Archive: forecast (per-model) + observations ──────────────────────
